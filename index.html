@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Slap &amp; Run! 3D</title>
+<meta name="theme-color" content="#15171e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #15171e; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  canvas { position: fixed; inset: 0; display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #hud { z-index: 2; }
+  /* probe used to read the notch / rounded-corner safe areas */
+  #safe { position: fixed; left: 0; top: 0; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="hud"></canvas>
+<div id="safe"></div>
+<!-- Three.js is bundled locally so the game works offline (just open this file) -->
+<script src="lib/three.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/view3d.js"></script>
+<script src="js/hud.js"></script>
+</body>
+</html>
