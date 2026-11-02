@@ -620,7 +620,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && gs 
 
 function touchButtons() {
   const u = clamp(Math.min(CW, CH) / 420, 0.75, 1.35);
-  return { slap: { x: CW - 82 * u, y: CH - 95 * u, r: 50 * u }, sprint: { x: CW - 196 * u, y: CH - 66 * u, r: 44 * u }, u };
+  return { sprint: { x: CW - 82 * u, y: CH - 92 * u, r: 52 * u }, u };
 }
 function slotRects() {
   const u = UI, s = 50 * u, gap = 10 * u, total = MAX_ITEMS * s + (MAX_ITEMS - 1) * gap;
@@ -644,7 +644,6 @@ cv.addEventListener('touchstart', e => {
   for (const t of e.changedTouches) {
     const x = t.clientX, y = t.clientY;
     if (gs !== 'play') { primary(); continue; }
-    if (Math.hypot(x - B.slap.x, y - B.slap.y) < B.slap.r * 1.2) { trySlap(); continue; }
     if (Math.hypot(x - B.sprint.x, y - B.sprint.y) < B.sprint.r * 1.25) { sprintTouch = t.identifier; continue; }
     const SR = slotRects();
     let hit = false;
@@ -2346,13 +2345,10 @@ function drawTouch() {
   const B = touchButtons(), u = B.u;
   ctx.globalAlpha = 0.85;
   ctx.lineWidth = 3; ctx.strokeStyle = '#fff';
-  ctx.fillStyle = 'rgba(231,76,60,0.85)'; circle(B.slap.x, B.slap.y, B.slap.r);
-  ctx.beginPath(); ctx.arc(B.slap.x, B.slap.y, B.slap.r, 0, TAU); ctx.stroke();
-  txt('SLAP', B.slap.x, B.slap.y + 7 * u, 18 * u, '#ffffff');
   ctx.fillStyle = sprintTouch !== null ? 'rgba(123,237,159,0.95)' : player.winded ? 'rgba(127,140,141,0.7)' : 'rgba(76,209,55,0.85)';
   circle(B.sprint.x, B.sprint.y, B.sprint.r);
   ctx.beginPath(); ctx.arc(B.sprint.x, B.sprint.y, B.sprint.r, 0, TAU); ctx.stroke();
-  txt('SPRINT', B.sprint.x, B.sprint.y + 5 * u, 13 * u, '#ffffff');
+  txt('SPRINT', B.sprint.x, B.sprint.y + 6 * u, 16 * u, '#ffffff');
   if (joy.active) {
     ctx.fillStyle = 'rgba(255,255,255,0.15)'; circle(joy.ox, joy.oy, 60 * u);
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; circle(joy.ox + joy.vx * 60 * u, joy.oy + joy.vy * 60 * u, 24 * u);

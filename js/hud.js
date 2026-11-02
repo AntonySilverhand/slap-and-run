@@ -484,7 +484,7 @@ const qualityText = () => 'GRAPHICS: ' + (qualityMode === 'auto' ? 'AUTO (' + Q.
 let menu = null, shopTab = 'SKILLS', panelScroll = 0, panelMax = 0, dispScore = 0, panelNote = null;
 const note = (text, color = '#7bed9f') => { panelNote = { text, color, t: gameTime + 3 }; };
 function openMenu(m) { menu = m; panelScroll = 0; sfx.ding(); }
-function touchButtons() { // slapping is automatic, so the only action button is SPRINT
+function touchButtons() {
   const u = clamp(Math.min(CW, CH) / 420, 0.75, 1.35);
   return { sprint: { x: CW - SA.r - 82 * u, y: CH - SA.b - 92 * u, r: 52 * u }, u };
 }
