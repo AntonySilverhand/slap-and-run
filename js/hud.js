@@ -162,8 +162,19 @@ function drawIcon(k, x, y, r) {
       for (let i = 0; i < 4; i++) { const w = r * (0.9 - i * 0.2); line(x - w + i * r * 0.08, y - r * 0.7 + i * r * 0.45, x + w + i * r * 0.08, y - r * 0.7 + i * r * 0.45); }
       break;
     case 'heart': heart(x, y, r * 0.7, '#ff4757'); break;
+    case 'box':
+      ctx.fillStyle = '#e1a32a'; rr(x - r * 0.75, y - r * 0.7, r * 1.5, r * 1.4, r * 0.2); ctx.fill();
+      ctx.fillStyle = '#c0392b'; ctx.fillRect(x - r * 0.12, y - r * 0.7, r * 0.24, r * 1.4);
+      txt('?', x, y + r * 0.35, r * 1.0, '#ffffff');
+      break;
+    case 'coin': drawCoin(x, y, r * 0.8); break;
   }
   ctx.restore();
+}
+function drawCoin(x, y, r) {
+  ctx.fillStyle = '#e1a32a'; circle(x, y + r * 0.12, r);
+  ctx.fillStyle = '#ffd32a'; circle(x, y, r);
+  ctx.strokeStyle = '#e1a32a'; ctx.lineWidth = Math.max(1, r * 0.18); ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.stroke();
 }
 
 // ---------- world-space overlay ----------
@@ -211,6 +222,20 @@ function drawWorldOverlay() {
       if (player.hidden) txt('HIDDEN', s.x, ay - 14, 12, '#dfe6e9');
     }
     if (p.say) bubbles.push({ x: s.x, y: s.y - 18 * k, text: p.say.text, a: clamp(p.say.t * 3, 0, 1), k });
+  }
+  // e-bike / scooter danger lanes
+  for (const r of riders) {
+    const pulse = 0.14 + 0.1 * Math.abs(Math.sin(gameTime * 8));
+    const a1 = V.project(r.x, 0, r.y - 13), a2 = V.project(r.x + r.dir * 460, 0, r.y - 13), b2 = V.project(r.x + r.dir * 460, 0, r.y + 13), b1 = V.project(r.x, 0, r.y + 13);
+    ctx.fillStyle = 'rgba(255,159,67,' + pulse + ')';
+    poly([a1.x, a1.y, a2.x, a2.y, b2.x, b2.y, b1.x, b1.y]);
+    const s = V.project(r.x, 30, r.y);
+    if ((s.x < 0 || s.x > CW) && ((gameTime * 6) | 0) % 2 === 0) {
+      const x = s.x < 0 ? 26 : CW - 26, y = clamp(s.y, 90, CH - 40);
+      ctx.fillStyle = '#ff9f43'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 13, 0, TAU); ctx.fill(); ctx.stroke();
+      txt(r.kind === 'ebike' ? 'BIKE' : 'SCOOT', x, y + 4, 8, '#ffffff');
+    }
   }
   // particles
   for (const p of parts) {
@@ -295,7 +320,7 @@ function drawWorldOverlay() {
     txt(Math.round(Math.abs(q.x - player.x) / 10) + 'm', left ? x + 24 : x - 24, y + 5, 12, '#ffffff');
   }
   for (const it of items) {
-    if (it.kind === 'pizza') continue;
+    if (it.kind === 'pizza' || it.kind === 'coin') continue;
     const s = edge(it.x, it.y, 20);
     if (s.x > 0 && s.x < CW) continue;
     const left = s.x <= 0, x = left ? 20 : CW - 20, y = clamp(s.y, 90, CH - 30);
@@ -335,7 +360,7 @@ function fitSize(s, size, maxW) {
 }
 function fitTxt(s, x, y, size, color, maxW, align = 'center') { txt(s, x, y, fitSize(s, size, maxW), color, align); }
 function wrapLines(s, size, maxW) {
-  ctx.font = fontPx(size);
+  ctx.font = fontPx(Math.max(9, size)); // measure at the size txt() will actually draw
   const words = s.split(' '), out = [];
   let cur = '';
   for (const w of words) {
@@ -384,6 +409,9 @@ function toggleFullscreen() {
 const qualityText = () => 'GRAPHICS: ' + (qualityMode === 'auto' ? 'AUTO (' + Q.label + ')' : Q.label);
 
 // ---------- HUD ----------
+let menu = null, shopTab = 'SKILLS', panelScroll = 0, panelMax = 0, dispScore = 0, panelNote = null;
+const note = (text, color = '#7bed9f') => { panelNote = { text, color, t: gameTime + 3 }; };
+function openMenu(m) { menu = m; panelScroll = 0; sfx.ding(); }
 function touchButtons() {
   const u = clamp(Math.min(CW, CH) / 420, 0.75, 1.35);
   return { slap: { x: CW - SA.r - 82 * u, y: CH - SA.b - 95 * u, r: 50 * u }, sprint: { x: CW - SA.r - 196 * u, y: CH - SA.b - 64 * u, r: 44 * u }, u };
@@ -394,7 +422,7 @@ function slotRects() {
     const B = touchButtons(), s = 42 * B.u, gap = 8 * B.u;
     for (let i = 0; i < MAX_ITEMS; i++) out.push({ x: B.sprint.x - B.sprint.r - 14 * B.u - (i + 1) * s - i * gap, y: B.sprint.y - s / 2, s });
   } else if (touchMode) { // a column above the SLAP button, within reach of the right thumb
-    const B = touchButtons(), s = 46 * B.u, gap = 8 * B.u;
+    const B = touchButtons(), s = (MAX_ITEMS > 3 ? 40 : 46) * B.u, gap = 8 * B.u;
     for (let i = 0; i < MAX_ITEMS; i++) out.push({ x: B.slap.x - s / 2, y: B.slap.y - B.slap.r - 14 * B.u - (i + 1) * s - i * gap, s });
   } else {
     const u = UI, s = 50 * u, gap = 10 * u, total = MAX_ITEMS * s + (MAX_ITEMS - 1) * gap;
@@ -402,16 +430,26 @@ function slotRects() {
   }
   return out;
 }
+function coinLabel(x, y, size, align = 'left', text) {
+  const s = text || save.coins.toLocaleString();
+  ctx.font = fontPx(size);
+  const w = ctx.measureText(s).width;
+  const cx0 = align === 'left' ? x + size * 0.5 : align === 'right' ? x - w - size * 0.7 : x - w / 2 - size * 0.35;
+  drawCoin(cx0, y - size * 0.36, size * 0.45);
+  txt(s, align === 'left' ? x + size * 1.15 : align === 'right' ? x : x + size * 0.35, y, size, '#ffd32a', align === 'center' ? 'center' : align);
+}
 function drawHUD() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   uiButtons = [];
   const u = UI, cx = CW / 2, narrow = isNarrow(), compact = narrow || isShort(), L0 = SA.l + 16 * u, R0 = CW - SA.r - 16 * u, T0 = SA.t;
-  if (gs === 'title') { drawTitle(); return; }
-  // left: score & stats
-  txt(score.toLocaleString(), L0, T0 + 42 * u, 36 * u, '#ffffff', 'left');
-  fitTxt('SLAPS ' + slaps + '   ESCAPES ' + escapes + '   ' + fmtTime(elapsed), L0, T0 + 64 * u, 14 * u, '#ffe082', narrow ? CW * 0.5 : 380 * u, 'left');
-  // active power-ups: list on wide screens, compact icon row on narrow ones
-  let py = T0 + 92 * u, px = L0 + 14 * u;
+  if (gs === 'title') { drawTitle(); drawPanel(); return; }
+  if (gs === 'over') { drawOver(); drawPanel(); drawFps(); return; } // results only, no in-run HUD behind them
+  // left: score, stats, coins (the score rolls up)
+  dispScore += (score - dispScore) * 0.2; if (Math.abs(score - dispScore) < 1) dispScore = score;
+  txt(Math.round(dispScore).toLocaleString(), L0, T0 + 42 * u, 36 * u, '#ffffff', 'left');
+  fitTxt('SLAPS ' + slaps + '   ESCAPES ' + escapes + '   ' + fmtTime(elapsed), L0, T0 + 63 * u, 13 * u, '#ffe082', narrow ? CW * 0.5 : 380 * u, 'left');
+  coinLabel(L0, T0 + 84 * u, 15 * u);
+  let py = T0 + 112 * u, px = L0 + 14 * u;
   for (const k in power) {
     if (power[k] <= 0) continue;
     const P = POWERS[k], f = clamp(power[k] / P.dur, 0, 1);
@@ -430,7 +468,7 @@ function drawHUD() {
     }
   }
   // right: hearts, sprint, district
-  const hs = narrow ? 11 * u : 13 * u;
+  const hs = (narrow ? 11 : 13) * u * (MAX_HEARTS > 8 ? 0.85 : 1);
   for (let i = 0; i < MAX_HEARTS; i++) heart(R0 - 12 * u - i * hs * 2.5, T0 + 30 * u, hs, i < player.hearts ? '#ff4757' : 'rgba(255,255,255,0.25)');
   const bw = (narrow ? 110 : 150) * u, bh = 12 * u, bx = R0 - bw, by = T0 + 52 * u;
   const infinite = power.energy > 0;
@@ -446,7 +484,7 @@ function drawHUD() {
   if (narrow) txt(label, R0, by + bh + 16 * u, 12 * u, player.winded && !infinite ? '#ff6b6b' : '#ffffff', 'right');
   else txt(label, bx - 8 * u, by + bh, 13 * u, player.winded && !infinite ? '#ff6b6b' : '#ffffff', 'right');
   txt(DISTRICTS[curDistrict].name, R0, by + bh + (narrow ? 32 : 20) * u, 11 * u, 'rgba(255,255,255,0.8)', 'right');
-  // centre messages (pushed below the corner widgets on narrow screens)
+  // centre messages
   let y = T0 + (narrow ? 132 : 44) * u;
   const cw = narrow ? CW * 0.9 : CW * 0.5;
   if (combo > 1) {
@@ -475,17 +513,24 @@ function drawHUD() {
     if (k) drawIcon(k, r.x + r.s / 2, r.y + r.s / 2, r.s * 0.34);
     if (!touchMode) txt(String(i + 1), r.x + 8 * u, r.y + 14 * u, 11 * u, '#ffffff', 'center');
   }
-  if (!touchMode && inventory.length) fitTxt('E = use  ' + POWERS[inventory[0]].name, SR[1].x + SR[1].s / 2, SR[0].y - 8 * u, 11 * u, '#ffffff', CW * 0.6);
+  if (!touchMode && inventory.length) fitTxt('E = use  ' + POWERS[inventory[0]].name, SR[0].x + (SR[MAX_ITEMS - 1].x + SR[0].s - SR[0].x) / 2, SR[0].y - 8 * u, 11 * u, '#ffffff', CW * 0.6);
   if (gs === 'play' && slaps === 0 && elapsed < 25) fitTxt('Just run into someone — the slap is automatic!', cx, touchMode ? CH * 0.62 : CH - SA.b - 105 * u, 18 * u, '#ffffff', CW * 0.9);
   if (!touchMode && gs === 'play' && !isShort()) {
     ctx.globalAlpha = 0.7;
-    fitTxt('WASD move · hold SHIFT sprint · E item · SPACE re-slap chaser · hide in phone booths · P pause · G graphics · M sound ' + (muted ? 'OFF' : 'ON'), L0, CH - SA.b - 8 * u, 10 * u, '#ffffff', CW - L0 * 2, 'left');
+    fitTxt('WASD move · hold SHIFT sprint · E item · SPACE re-slap chaser · hide in phone booths · P pause · M sound ' + (muted ? 'OFF' : 'ON'), L0, CH - SA.b - 8 * u, 10 * u, '#ffffff', CW - L0 * 2, 'left');
     ctx.globalAlpha = 1;
   }
   if (touchMode && gs === 'play') drawTouch();
   if (touchMode && gs === 'play') {
     if (narrow) button('II', cx, T0 + 104 * u, 40 * u, 30 * u, () => { gs = 'paused'; });
     else button('II', R0 - MAX_HEARTS * hs * 2.5 - 30 * u, T0 + 28 * u, 40 * u, 30 * u, () => { gs = 'paused'; });
+  }
+  drawToasts();
+  if (announce) { // combo announcer: pops in the lower middle, never blocks the street for long
+    const age = announce.max - announce.t, sc = 1 + 0.8 * Math.max(0, 1 - age / 0.12);
+    ctx.globalAlpha = clamp(announce.t * 3, 0, 1);
+    fitTxt(announce.text, cx, CH * 0.66, 40 * u * sc, 'hsl(' + ((gameTime * 400) % 360) + ',95%,65%)', CW * 0.9);
+    ctx.globalAlpha = 1;
   }
   if (banner) {
     const age = banner.max - banner.t, sc = 1 + 0.5 * Math.max(0, 1 - age / 0.15);
@@ -496,7 +541,25 @@ function drawHUD() {
   }
   if (gs === 'paused') drawPause();
   if (gs === 'over') drawOver();
+  drawPanel();
   drawFps();
+}
+// small notes that slide in at the side — missions done, Slap Book entries, unlocks
+function drawToasts() {
+  if (!toasts.length) return;
+  const u = UI, x = SA.l + 14 * u, maxW = Math.min(CW * 0.62, 460 * u);
+  let y = isNarrow() ? CH * 0.5 : CH * 0.42;
+  for (const t of toasts) {
+    const a = clamp(Math.min(t.t * 2.5, (3.4 - t.t) * 6), 0, 1), slide = (1 - clamp((3.4 - t.t) * 6, 0, 1)) * -40 * u;
+    const size = fitSize(t.text, 12 * u, maxW - 24 * u);
+    ctx.font = fontPx(size);
+    const w = ctx.measureText(t.text).width + 24 * u, h = 26 * u;
+    ctx.globalAlpha = a * 0.85; ctx.fillStyle = 'rgba(10,12,20,0.8)'; rr(x + slide, y - h + 6 * u, w, h, 8 * u); ctx.fill();
+    ctx.fillStyle = t.color; ctx.fillRect(x + slide, y - h + 6 * u, 4 * u, h);
+    ctx.globalAlpha = a; txt(t.text, x + slide + 12 * u, y - 3 * u, size, t.color, 'left');
+    y += h + 6 * u;
+  }
+  ctx.globalAlpha = 1;
 }
 let fpsShown = 60, fpsAcc = 0, fpsN = 0;
 function drawFps() {
@@ -524,68 +587,277 @@ function drawTouch() {
   }
   ctx.globalAlpha = 1;
 }
-function menuButtons(y, u) {
-  const bw = Math.min(CW * 0.8, 300 * u), bh = 40 * u, gap = 12 * u, cx = CW / 2;
-  button(qualityText(), cx, y, bw, bh, cycleQualityMode, '#7bed9f'); y += bh + gap;
-  button('SOUND: ' + (muted ? 'OFF' : 'ON'), cx, y, bw, bh, () => { muted = !muted; }, '#74b9ff'); y += bh + gap;
-  button('FPS COUNTER: ' + (showFps ? 'ON' : 'OFF'), cx, y, bw, bh, toggleFps, '#dfe6e9'); y += bh + gap;
-  if (IS_TOUCH_DEVICE && canFullscreen()) { button('FULLSCREEN', cx, y, bw, bh, toggleFullscreen, '#ffeaa7'); y += bh + gap; }
-  return y;
+// compact mission list (shown on title / pause / busted — never during play)
+function drawMissions(x, y, w, size) {
+  txt('MISSIONS  ·  they complete as you play', x, y, size * 0.85, '#7bed9f', 'left');
+  y += size * 0.5;
+  for (const m of save.missions) {
+    y += size * 1.45;
+    const f = clamp(m.prog / m.goal, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; rr(x, y - size * 1.1, w, size * 1.35, size * 0.3); ctx.fill();
+    ctx.fillStyle = 'rgba(123,237,159,0.35)'; rr(x, y - size * 1.1, Math.max(size * 0.6, w * f), size * 1.35, size * 0.3); ctx.fill();
+    const prog = m.max ? Math.min(m.prog, m.goal) + '/' + m.goal : Math.min(m.prog, m.goal) + '/' + m.goal;
+    fitTxt(m.text, x + size * 0.5, y, size * 0.8, '#ffffff', w - size * 8.2, 'left');
+    txt(prog, x + w - size * 4, y, size * 0.72, '#dfe6e9', 'right');
+    coinLabel(x + w - size * 0.4, y, size * 0.75, 'right', String(m.reward));
+  }
+  return y + size * 0.6;
 }
 function drawPause() {
-  const u = UI, cx = CW / 2;
+  const u = UI, cx = CW / 2, bw = Math.min(CW * 0.8, 300 * u);
   ctx.fillStyle = 'rgba(10,12,20,0.65)'; ctx.fillRect(0, 0, CW, CH);
-  let y = CH * 0.28;
-  fitTxt('PAUSED', cx, y, 60 * u, '#ffffff', CW * 0.9);
-  y += 50 * u;
-  button('RESUME', cx, y, Math.min(CW * 0.8, 300 * u), 46 * u, () => { gs = 'play'; }, '#ff6b6b');
-  menuButtons(y + 58 * u, u);
+  let y = SA.t + Math.max(CH * 0.18, 60 * u);
+  fitTxt('PAUSED', cx, y, 56 * u, '#ffffff', CW * 0.9);
+  y += 46 * u;
+  button('RESUME', cx, y, bw, 46 * u, () => { gs = 'play'; }, '#ff6b6b'); y += 56 * u;
+  button('SETTINGS', cx, y, bw, 40 * u, () => openMenu('settings'), '#7bed9f'); y += 50 * u;
+  button('QUIT TO TITLE', cx, y, bw, 40 * u, () => { persist(); reset(); gs = 'title'; }, '#dfe6e9'); y += 40 * u;
+  drawMissions(cx - Math.min(CW * 0.9, 460 * u) / 2, y + 10 * u, Math.min(CW * 0.9, 460 * u), 16 * u);
 }
 function drawTitle() {
-  const u = UI, cx = CW / 2, maxW = CW * 0.92 - SA.l - SA.r, short = isShort();
+  const u0 = UI, cx = CW / 2, maxW = CW * 0.92 - SA.l - SA.r;
   ctx.fillStyle = 'rgba(10,12,20,0.5)'; ctx.fillRect(0, 0, CW, CH);
-  const logo = fitSize('SLAP & RUN!', (short ? 60 : 84) * u, maxW);
-  ctx.save();
-  ctx.translate(cx, SA.t + logo * 1.05); ctx.rotate(-0.05 + Math.sin(gameTime * 2) * 0.015);
-  txt('SLAP & RUN!', 0, 0, logo, '#ffdd59');
-  ctx.restore();
-  const controls = touchMode || IS_TOUCH_DEVICE
-    ? [{ text: 'Drag on the left side to move — slaps are automatic!', size: 16 * u, color: '#ffe082' },
-       { text: 'Hold SPRINT to run fast · tap the item slots to use items', size: 16 * u, color: '#ffe082', gap: 8 * u }]
-    : [{ text: 'MOVE — WASD / Arrows   ·   SLAP — automatic, just run into people', size: 16 * u, color: '#ffe082' },
-       { text: 'SPRINT — hold SHIFT   ·   ITEMS — grab ? boxes, use with E or 1-3', size: 16 * u, color: '#ffe082' },
-       { text: 'RE-SLAP A CHASER — SPACE   ·   PAUSE — P   ·   GRAPHICS — G   ·   FPS — F   ·   SOUND — M', size: 14 * u, color: '#ffe082', gap: 8 * u }];
-  const entries = [
-    { text: 'Slap strangers. They get back up angry — and they run FASTER than you.', size: 17 * u, color: '#ffffff' },
-    { text: 'Slap as many as you dare. You have 8 hearts — grab floating hearts, first-aid kits, pizza and combo bonuses to refill them.', size: 15 * u, color: '#dfe6e9', gap: 12 * u },
-    ...controls,
-    { text: 'Shake off the haters: sprint, hide in phone booths, lure them into traffic or open manholes, run through pigeons, wait for the ice cream truck — or use UFOs, pies, freeze rays, tornados, cash and flowers.', size: 13 * u, color: '#c8d6e5' },
-    { text: '24 kinds of people across 4 neighbourhoods, with day and night.', size: 13 * u, color: '#c8d6e5' },
-  ];
-  const nBtn = short ? 1 : 3 + (IS_TOUCH_DEVICE && canFullscreen() ? 1 : 0);
-  const btnH = 40 * u, footer = nBtn * (btnH + 12 * u) + 60 * u;
-  const end = drawBlock(entries, SA.t + logo * 1.35, CH - SA.b - footer, maxW);
-  let y = Math.max(end + 30 * u, CH - SA.b - footer + 26 * u);
-  if (((gameTime * 2) | 0) % 2 === 0) fitTxt(touchMode || IS_TOUCH_DEVICE ? 'TAP TO START' : 'PRESS SPACE TO START', cx, y, 28 * u, '#ff6b6b', maxW);
-  if (best > 0) txt('BEST ' + best.toLocaleString(), cx, y + 22 * u, 13 * u, '#ffe082');
-  y += 44 * u;
-  if (short) { const bw = Math.min(CW * 0.42, 260 * u); button(qualityText(), cx - bw / 2 - 6 * u, y + 6 * u, bw, btnH * 0.85, cycleQualityMode, '#7bed9f'); button('SOUND: ' + (muted ? 'OFF' : 'ON'), cx + bw / 2 + 6 * u, y + 6 * u, bw, btnH * 0.85, () => { muted = !muted; }, '#74b9ff'); }
-  else menuButtons(y + 10 * u, u);
+  const u = u0 * Math.min(1, (CH - SA.t - SA.b - 16) / (470 * u0)); // squeeze on short screens
+  let y = SA.t + 10 * u;
+  const logo = fitSize('SLAP & RUN!', 78 * u, maxW);
+  ctx.save(); ctx.translate(cx, y + logo * 0.9); ctx.rotate(-0.05 + Math.sin(gameTime * 2) * 0.015);
+  txt('SLAP & RUN!', 0, 0, logo, '#ffdd59'); ctx.restore();
+  y += logo * 1.25;
+  fitTxt('Slap strangers. They get up angry — and run FASTER than you.', cx, y, 16 * u, '#ffffff', maxW); y += 26 * u;
+  const pf = currentProfile(), lv = levelInfo(save.stats.xp);
+  button(pf.name + '  ·  LV ' + lv.level + '   ', cx - 70 * u, y - 5 * u, 150 * u, 28 * u, () => openMenu('profile'), pf.color);
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(cx - 130 * u, y + 7 * u, 120 * u, 3 * u);
+  ctx.fillStyle = pf.color; ctx.fillRect(cx - 130 * u, y + 7 * u, 120 * u * lv.into / lv.need, 3 * u);
+  coinLabel(cx + 70 * u, y + 1 * u, 18 * u, 'center');
+  if (best > 0) txt('BEST ' + best.toLocaleString(), cx + 70 * u, y + 19 * u, 11 * u, '#ffe082');
+  y += 46 * u;
+  const bw = Math.min(maxW, 360 * u);
+  button(IS_TOUCH_DEVICE || touchMode ? 'PLAY' : 'PLAY   [SPACE]', cx, y, bw, 52 * u, () => { if (!menu) startFromTap(); }, '#ff6b6b'); y += 50 * u;
+  const sw = (bw - 16 * u) / 3;
+  button('SHOP', cx - sw - 8 * u, y, sw, 38 * u, () => openMenu('shop'), '#ffd32a');
+  button('SLAP BOOK ' + bookCount() + '/' + BOOK_TYPES.length, cx, y, sw, 38 * u, () => openMenu('book'), '#e056fd');
+  button('SETTINGS', cx + sw + 8 * u, y, sw, 38 * u, () => openMenu('settings'), '#7bed9f');
+  y += 46 * u;
+  y = drawMissions(cx - bw / 2, y, bw, 15 * u);
+  const hint = touchMode || IS_TOUCH_DEVICE ? 'Drag to move · slaps are automatic · hold SPRINT · tap items to use them'
+    : 'WASD move · slaps are automatic · hold SHIFT to sprint · E uses items · SPACE re-slaps a chaser';
+  ctx.globalAlpha = 0.8; fitTxt(hint, cx, Math.min(CH - SA.b - 10 * u, y + 20 * u), 12 * u, '#c8d6e5', maxW); ctx.globalAlpha = 1;
 }
 function drawOver() {
-  const u = UI, cx = CW / 2, maxW = CW * 0.92;
-  ctx.fillStyle = 'rgba(10,12,20,' + Math.min(0.7, overT * 1.2) + ')'; ctx.fillRect(0, 0, CW, CH);
-  let y = SA.t + Math.max(CH * 0.2, 70 * u);
-  fitTxt('BUSTED!', cx, y, 80 * u, '#ff4757', maxW);
+  const u0 = UI, cx = CW / 2, maxW = CW * 0.92;
+  const u = u0 * Math.min(1, (CH - SA.t - SA.b - 16) / (500 * u0));
+  ctx.fillStyle = 'rgba(10,12,20,' + Math.min(0.72, overT * 1.2) + ')'; ctx.fillRect(0, 0, CW, CH);
+  let y = SA.t + 66 * u;
+  fitTxt('BUSTED!', cx, y, 64 * u, '#ff4757', maxW); y += 44 * u;
+  fitTxt('SCORE  ' + score.toLocaleString(), cx, y, 32 * u, '#ffffff', maxW);
+  if (newBest && ((gameTime * 3) | 0) % 2 === 0) txt('NEW BEST!', cx, y + 24 * u, 17 * u, '#ffdd59');
   y += 52 * u;
-  fitTxt('SCORE  ' + score.toLocaleString(), cx, y, 36 * u, '#ffffff', maxW);
-  if (newBest && ((gameTime * 3) | 0) % 2 === 0) txt('NEW BEST!', cx, y + 30 * u, 20 * u, '#ffdd59');
-  const end = drawBlock([
-    { text: 'Faces slapped: ' + slaps + '   ·   Best combo: x' + bestCombo + '   ·   Escapes: ' + escapes, size: 17 * u, color: '#ffe082' },
-    { text: 'Traffic takedowns: ' + carHits + '   ·   Boxes opened: ' + boxesOpened + '   ·   Survived: ' + fmtTime(elapsed), size: 17 * u, color: '#ffe082' },
-    { text: 'Best score: ' + best.toLocaleString(), size: 15 * u, color: '#c8d6e5' },
-  ], y + 44 * u, CH - SA.b - 70 * u, maxW);
-  if (overT > 0.9 && ((gameTime * 2) | 0) % 2 === 0) fitTxt(touchMode ? 'TAP TO PLAY AGAIN' : 'PRESS SPACE TO PLAY AGAIN', cx, Math.min(end + 44 * u, CH - SA.b - 24 * u), 26 * u, '#ff6b6b', maxW);
+  coinLabel(cx, y, 22 * u, 'center', '+' + runCoins + ' coins'); y += 18 * u;
+  txt('(includes +' + runBonus + ' end-of-run bonus)  ·  total ' + save.coins.toLocaleString(), cx, y, 11 * u, '#dfe6e9');
+  y += 22 * u;
+  const lvi = levelInfo(save.stats.xp);
+  fitTxt(currentProfile().name + '  +' + runXp + ' XP  ·  LV ' + lvi.level + '  (' + lvi.into + '/' + lvi.need + ')', cx, y, 13 * u, '#a29bfe', maxW);
+  if (runLevelUp && ((gameTime * 3) | 0) % 2 === 0) fitTxt('LEVEL UP! You reached LV ' + runLevelUp + ' (+' + 25 * runLevelUp + ' coins)', cx, y + 20 * u, 15 * u, '#e056fd', maxW);
+  y += runLevelUp ? 44 * u : 26 * u;
+  for (const r of newRecords.slice(0, 2)) { fitTxt('NEW RECORD: ' + r + '!', cx, y, 15 * u, '#ffdd59', maxW); y += 21 * u; }
+  for (const m of runDone.slice(0, 3)) { fitTxt('MISSION DONE: ' + m.text + '  +' + m.reward, cx, y, 13 * u, '#7bed9f', maxW); y += 19 * u; }
+  fitTxt('Slaps ' + slaps + '  ·  Best combo x' + bestCombo + '  ·  Escapes ' + escapes + '  ·  Close calls ' + runClose + '  ·  ' + fmtTime(elapsed), cx, y + 4 * u, 13 * u, '#ffe082', maxW);
+  y += 28 * u;
+  const g = nextGoal();
+  if (g) fitTxt(save.coins >= g.cost ? 'You can afford ' + g.name + ' (' + g.cost + ') — visit the shop!' : 'Next upgrade: ' + g.name + ' — ' + (g.cost - save.coins) + ' more coins', cx, y, 14 * u, save.coins >= g.cost ? '#7bed9f' : '#c8d6e5', maxW);
+  y += 34 * u;
+  if (overT > 0.9) {
+    const bw = Math.min(maxW, 340 * u), sw = (bw - 10 * u) / 2;
+    button(touchMode ? 'PLAY AGAIN' : 'PLAY AGAIN  [SPACE]', cx, y, bw, 48 * u, () => { if (!menu) startGame(); }, '#ff6b6b'); y += 54 * u;
+    button('SHOP', cx - sw / 2 - 5 * u, y, sw, 38 * u, () => openMenu('shop'), '#ffd32a');
+    button('SLAP BOOK', cx + sw / 2 + 5 * u, y, sw, 38 * u, () => openMenu('book'), '#e056fd');
+  }
+}
+
+// ---------- panels: shop, Slap Book, settings ----------
+const TYPE_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#f1c40f', '#fd79a8', '#00b894', '#6c5ce7', '#ff7675', '#74b9ff'];
+function drawPanel() {
+  if (!menu) return;
+  const u = UI;
+  ctx.fillStyle = 'rgba(8,10,18,0.82)'; ctx.fillRect(0, 0, CW, CH);
+  const pw = Math.min(CW - SA.l - SA.r - 16, 760 * u), ph = CH - SA.t - SA.b - 20;
+  const px = (CW - pw) / 2, py = SA.t + 10;
+  ctx.fillStyle = 'rgba(30,34,48,0.97)'; ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 2;
+  rr(px, py, pw, ph, 16 * u); ctx.fill(); ctx.stroke();
+  const title = { shop: 'SHOP', book: 'SLAP BOOK', settings: 'SETTINGS', profile: 'PLAYER' }[menu];
+  txt(title, px + 18 * u, py + 36 * u, 26 * u, { shop: '#ffd32a', book: '#e056fd', settings: '#7bed9f', profile: '#48dbfb' }[menu], 'left');
+  coinLabel(px + pw - 64 * u, py + 34 * u, 16 * u, 'right');
+  button('X', px + pw - 30 * u, py + 28 * u, 36 * u, 32 * u, () => { menu = null; persist(); }, '#ff6b6b');
+  let top = py + 56 * u;
+  if (menu === 'shop') {
+    const tabs = ['SKILLS', 'GEAR', 'PERKS', 'STYLE'], tw = (pw - 36 * u) / tabs.length;
+    tabs.forEach((t, i) => button(t, px + 18 * u + tw * (i + 0.5), top + 16 * u, tw - 6 * u, 30 * u, () => { shopTab = t; panelScroll = 0; }, shopTab === t ? '#ffd32a' : '#8395a7'));
+    top += 40 * u;
+  }
+  const area = { x: px + 12 * u, y: top, w: pw - 24 * u, h: py + ph - top - 12 * u };
+  ctx.save();
+  ctx.beginPath(); ctx.rect(area.x, area.y, area.w, area.h); ctx.clip();
+  const contentH = menu === 'shop' ? drawShop(area, u) : menu === 'book' ? drawBook(area, u) : menu === 'profile' ? drawProfile(area, u) : drawSettings(area, u);
+  ctx.restore();
+  panelMax = Math.max(0, contentH - area.h);
+  panelScroll = clamp(panelScroll, 0, panelMax);
+  if (panelNote && panelNote.t > gameTime) { ctx.fillStyle = 'rgba(0,0,0,0.75)'; const nw = Math.min(pw - 40, 520 * u); rr(px + (pw - nw) / 2, py + ph - 52 * u, nw, 38 * u, 10 * u); ctx.fill(); fitTxt(panelNote.text, px + pw / 2, py + ph - 27 * u, 13 * u, panelNote.color, nw - 20); }
+  if (panelMax > 0) { // scrollbar
+    const sh = area.h * area.h / contentH;
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; rr(area.x + area.w - 4, area.y + (area.h - sh) * panelScroll / panelMax, 4, sh, 2); ctx.fill();
+  }
+}
+// buttons inside the scrolling area are only clickable while visible
+function areaButton(area, label, x, y, w, h, action, color) {
+  if (y + h / 2 < area.y || y - h / 2 > area.y + area.h) return;
+  button(label, x, y, w, h, action, color);
+}
+function drawShop(A, u) {
+  let y = A.y - panelScroll + 6 * u;
+  const rowH = 66 * u;
+  if (shopTab !== 'STYLE') {
+    for (const up of UPGRADES.filter(x => x.tab === shopTab)) {
+      const L = lvl(up.id), maxed = L >= up.max, cost = upCost(up), afford = save.coins >= cost;
+      ctx.fillStyle = 'rgba(255,255,255,0.06)'; rr(A.x, y, A.w - 8, rowH - 8 * u, 10 * u); ctx.fill();
+      drawIcon(up.icon, A.x + 30 * u, y + rowH / 2 - 4 * u, 16 * u);
+      txt(up.name, A.x + 58 * u, y + 24 * u, 16 * u, '#ffffff', 'left');
+      for (let i = 0; i < up.max; i++) { ctx.fillStyle = i < L ? '#ffd32a' : 'rgba(255,255,255,0.2)'; rr(A.x + 58 * u + i * 16 * u, y + 32 * u, 12 * u, 6 * u, 3); ctx.fill(); }
+      fitTxt(up.desc, A.x + 58 * u, y + 52 * u, 11 * u, '#c8d6e5', A.w - 200 * u, 'left');
+      areaButton(A, maxed ? 'MAX' : 'BUY ' + cost, A.x + A.w - 72 * u, y + rowH / 2 - 4 * u, 120 * u, 36 * u, () => { if (!maxed) buyUpgrade(up); }, maxed ? '#8395a7' : afford ? '#7bed9f' : '#ff6b6b');
+      y += rowH;
+    }
+    y += 6 * u;
+    ctx.globalAlpha = 0.7; fitTxt('Upgrades help you slap and escape — but angry people stay faster than your normal run.', A.x + A.w / 2, y + 14 * u, 11 * u, '#c8d6e5', A.w - 20); ctx.globalAlpha = 1;
+    y += 30 * u;
+  } else {
+    for (const [slot, head] of [['hat', 'HATS'], ['shirt', 'HOODIES'], ['trail', 'TRAILS'], ['glove', 'GLOVES']]) {
+      txt(head, A.x + 6 * u, y + 20 * u, 14 * u, '#ffd32a', 'left'); y += 28 * u;
+      for (const c of COSMETICS.filter(x => x.slot === slot)) {
+        const owned = save.owned[c.id], eq = save.eq[slot] === c.id;
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; rr(A.x, y, A.w - 8, 48 * u, 10 * u); ctx.fill();
+        const sw = c.look ? (c.look.hat || c.look.shirt) : slot === 'trail' ? { trail_sparkle: '#ffffff', trail_flame: '#ff9f1a', trail_rainbow: 'hsl(' + ((gameTime * 200) % 360) + ',90%,60%)' }[c.id] || '#555' : c.id === 'glove_gold' ? '#f1c40f' : '#f1c27d';
+        ctx.fillStyle = sw; circle(A.x + 26 * u, y + 24 * u, 13 * u);
+        txt(c.name, A.x + 50 * u, y + 30 * u, 14 * u, '#ffffff', 'left');
+        let label, col, act = () => buyCosmetic(c);
+        if (eq) { label = 'EQUIPPED'; col = '#8395a7'; act = () => { }; }
+        else if (owned) { label = 'EQUIP'; col = '#7bed9f'; }
+        else if (c.unlock) { label = 'BOOK ' + bookCount() + '/' + c.unlock; col = '#e056fd'; act = () => { sfx.whiff(); }; }
+        else { label = 'BUY ' + c.cost; col = save.coins >= c.cost ? '#7bed9f' : '#ff6b6b'; }
+        areaButton(A, label, A.x + A.w - 72 * u, y + 24 * u, 120 * u, 32 * u, act, col);
+        y += 54 * u;
+      }
+      y += 8 * u;
+    }
+  }
+  return y + panelScroll - A.y;
+}
+function drawBook(A, u) {
+  let y = A.y - panelScroll + 8 * u;
+  const n = bookCount();
+  fitTxt('You\'ve slapped ' + n + ' of ' + BOOK_TYPES.length + ' kinds of people. Pages fill in on their own as you play.', A.x + A.w / 2, y + 14 * u, 13 * u, '#ffffff', A.w - 20);
+  y += 30 * u;
+  for (const c of COSMETICS.filter(c => c.unlock)) {
+    const got = save.owned[c.id];
+    fitTxt((got ? 'UNLOCKED: ' : c.unlock + ' kinds → ') + c.name, A.x + A.w / 2, y + 12 * u, 12 * u, got ? '#7bed9f' : '#e056fd', A.w - 20);
+    y += 20 * u;
+  }
+  y += 10 * u;
+  const cols = Math.max(2, Math.floor(A.w / (150 * u))), cw = (A.w - 8) / cols, ch = 74 * u;
+  BOOK_TYPES.forEach((t, i) => {
+    const cx0 = A.x + (i % cols) * cw, cy0 = y + Math.floor(i / cols) * ch;
+    const cnt = save.book[t] || 0;
+    ctx.fillStyle = cnt ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.3)'; rr(cx0 + 3, cy0 + 3, cw - 6, ch - 6, 10 * u); ctx.fill();
+    ctx.fillStyle = cnt ? TYPE_COLORS[i % TYPE_COLORS.length] : '#3d4048'; circle(cx0 + 26 * u, cy0 + ch / 2, 16 * u);
+    txt(cnt ? TYPES[t].name.charAt(0) : '?', cx0 + 26 * u, cy0 + ch / 2 + 6 * u, 16 * u, '#ffffff');
+    fitTxt(cnt ? TYPES[t].name : '???', cx0 + 50 * u, cy0 + ch / 2 - 2 * u, 13 * u, cnt ? '#ffffff' : '#636e72', cw - 58 * u, 'left');
+    txt(cnt ? 'slapped x' + cnt : 'not met yet', cx0 + 50 * u, cy0 + ch / 2 + 16 * u, 10 * u, cnt ? '#ffd32a' : '#636e72', 'left');
+  });
+  y += Math.ceil(BOOK_TYPES.length / cols) * ch + 10 * u;
+  return y + panelScroll - A.y;
+}
+function drawProfile(A, u) {
+  let y = A.y - panelScroll + 8 * u;
+  const pf = currentProfile(), st = save.stats, lv = levelInfo(st.xp), onTitle = gs === 'title';
+  const x0 = A.x + 6 * u, w = A.w - 14 * u, mid = A.x + A.w / 2;
+  ctx.fillStyle = pf.color; circle(x0 + 26 * u, y + 28 * u, 22 * u);
+  txt(pf.name.charAt(0).toUpperCase(), x0 + 26 * u, y + 37 * u, 24 * u, '#ffffff');
+  fitTxt(pf.name, x0 + 60 * u, y + 26 * u, 22 * u, '#ffffff', w - 200 * u, 'left');
+  txt('LEVEL ' + lv.level + '   ·   ' + lv.into + ' / ' + lv.need + ' XP', x0 + 60 * u, y + 46 * u, 12 * u, '#a29bfe', 'left');
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; rr(x0 + 60 * u, y + 52 * u, Math.min(260 * u, w - 200 * u), 6 * u, 3); ctx.fill();
+  ctx.fillStyle = pf.color; rr(x0 + 60 * u, y + 52 * u, Math.min(260 * u, w - 200 * u) * lv.into / lv.need, 6 * u, 3); ctx.fill();
+  if (onTitle) areaButton(A, 'RENAME', A.x + A.w - 70 * u, y + 30 * u, 110 * u, 32 * u, () => { const n = window.prompt('Player name', pf.name); if (n !== null) { renameProfile(n); note('Renamed to ' + currentProfile().name); } }, '#48dbfb');
+  y += 76 * u;
+  // lifetime stats
+  const t = st.time, hrs = Math.floor(t / 3600), mins = Math.floor((t % 3600) / 60);
+  const rows = [
+    ['Runs played', st.runs], ['Play time', (hrs ? hrs + 'h ' : '') + mins + 'm'], ['Faces slapped', st.slaps], ['Chasers escaped', st.escapes],
+    ['Coins earned', st.coins], ['Close calls', st.close], ['Traffic takedowns', st.traffic], ['Boxes opened', st.boxes],
+    ['Missions done', save.done], ['Slap Book', bookCount() + ' / ' + BOOK_TYPES.length],
+    ['Best score', save.rec.score], ['Longest combo', 'x' + (save.rec.combo || 0)], ['Longest run', fmtTime(save.rec.time || 0)], ['Most slaps in a run', save.rec.slaps || 0],
+  ];
+  txt('LIFETIME STATS & RECORDS', x0, y + 14 * u, 13 * u, '#48dbfb', 'left'); y += 24 * u;
+  const cols = A.w > 520 * u ? 2 : 1, cwid = (w - 10 * u) / cols, rh = 26 * u;
+  rows.forEach(([k, v], i) => {
+    const cx0 = x0 + (i % cols) * (cwid + 10 * u), cy0 = y + Math.floor(i / cols) * rh;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; rr(cx0, cy0, cwid, rh - 4 * u, 6 * u); ctx.fill();
+    txt(k, cx0 + 10 * u, cy0 + 16 * u, 12 * u, '#c8d6e5', 'left');
+    txt(typeof v === 'number' ? v.toLocaleString() : String(v), cx0 + cwid - 10 * u, cy0 + 16 * u, 12 * u, '#ffffff', 'right');
+  });
+  y += Math.ceil(rows.length / cols) * rh + 14 * u;
+  // players on this device
+  txt('PLAYERS ON THIS DEVICE', x0, y + 14 * u, 13 * u, '#48dbfb', 'left'); y += 24 * u;
+  if (!onTitle) { ctx.globalAlpha = 0.7; fitTxt('Switch players from the title screen.', mid, y + 12 * u, 12 * u, '#c8d6e5', w); ctx.globalAlpha = 1; y += 26 * u; }
+  for (const p of profiles.list) {
+    const cur = p.id === profiles.current, ps = cur ? save : readSave(p.id), plv = levelInfo(ps.stats.xp).level;
+    ctx.fillStyle = cur ? 'rgba(72,219,251,0.12)' : 'rgba(255,255,255,0.05)'; rr(x0, y, w, 44 * u, 10 * u); ctx.fill();
+    ctx.fillStyle = p.color; circle(x0 + 22 * u, y + 22 * u, 13 * u);
+    fitTxt(p.name + (cur ? '  (playing)' : ''), x0 + 44 * u, y + 20 * u, 14 * u, '#ffffff', w - 260 * u, 'left');
+    txt('LV ' + plv + '  ·  ' + ps.coins.toLocaleString() + ' coins  ·  best ' + (ps.rec.score || 0).toLocaleString(), x0 + 44 * u, y + 36 * u, 10 * u, '#c8d6e5', 'left');
+    if (onTitle && !cur) {
+      areaButton(A, 'PLAY AS', x0 + w - 150 * u, y + 22 * u, 90 * u, 30 * u, () => { loadProfile(p.id); note('Now playing as ' + p.name); }, '#7bed9f');
+      areaButton(A, 'DELETE', x0 + w - 50 * u, y + 22 * u, 80 * u, 30 * u, () => { if (window.confirm('Delete ' + p.name + ' and all their progress?')) { deleteProfile(p.id); note(p.name + ' deleted', '#ff6b6b'); } }, '#ff6b6b');
+    }
+    y += 50 * u;
+  }
+  const bw2 = Math.min(w, 300 * u), gap = 50 * u;
+  if (onTitle && profiles.list.length < MAX_PROFILES) { areaButton(A, '+ NEW PLAYER', mid, y + 20 * u, bw2, 38 * u, () => { const n = window.prompt('New player name', 'Player ' + (profiles.list.length + 1)); if (n !== null) { newProfile(n); note('Welcome, ' + currentProfile().name + '!'); } }, '#7bed9f'); y += gap; }
+  // moving progress between devices
+  y += 6 * u;
+  txt('MOVE PROGRESS TO ANOTHER DEVICE', x0, y + 14 * u, 13 * u, '#48dbfb', 'left'); y += 22 * u;
+  ctx.globalAlpha = 0.8; for (const l of wrapLines('Progress is saved on this device only. Copy your backup code and paste it into the game on another phone or computer (or keep it somewhere safe in case browser data is cleared).', 11 * u, w)) { y += 15 * u; txt(l, x0, y, 11 * u, '#c8d6e5', 'left'); } ctx.globalAlpha = 1;
+  y += 24 * u;
+  areaButton(A, 'COPY BACKUP CODE', mid, y, bw2, 38 * u, () => {
+    const code = exportCode();
+    const fallback = () => window.prompt('Copy this backup code:', code);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(() => note('Backup code copied — paste it on your other device'), fallback);
+    else fallback();
+  }, '#ffeaa7');
+  y += gap;
+  if (onTitle) {
+    areaButton(A, 'RESTORE FROM CODE', mid, y, bw2, 38 * u, () => {
+      const code = window.prompt('Paste a backup code (it is added as a new player):', '');
+      if (code === null) return;
+      const r = importCode(code);
+      if (r === 'full') note('This device already has ' + MAX_PROFILES + ' players — delete one first', '#ff6b6b');
+      else if (r) note('Restored! Now playing as ' + r);
+      else note('That code did not work — copy the whole code and try again', '#ff6b6b');
+    }, '#ffeaa7');
+    y += gap;
+  }
+  return y + panelScroll - A.y;
+}
+function drawSettings(A, u) {
+  let y = A.y - panelScroll + 30 * u;
+  const bw = Math.min(A.w - 20, 340 * u), x = A.x + A.w / 2, bh = 42 * u, gap = 54 * u;
+  areaButton(A, qualityText(), x, y, bw, bh, cycleQualityMode, '#7bed9f'); y += gap;
+  areaButton(A, 'SOUND: ' + (muted ? 'OFF' : 'ON'), x, y, bw, bh, () => { muted = !muted; }, '#74b9ff'); y += gap;
+  areaButton(A, 'MUSIC: ' + (save.music ? 'ON' : 'OFF'), x, y, bw, bh, () => Music.toggle(), '#a29bfe'); y += gap;
+  areaButton(A, 'FPS COUNTER: ' + (showFps ? 'ON' : 'OFF'), x, y, bw, bh, toggleFps, '#dfe6e9'); y += gap;
+  if (IS_TOUCH_DEVICE && canFullscreen()) { areaButton(A, 'FULLSCREEN', x, y, bw, bh, toggleFullscreen, '#ffeaa7'); y += gap; }
+  ctx.globalAlpha = 0.7;
+  fitTxt('Keys: G graphics · M sound · F fps · B shop · N Slap Book', x, y, 11 * u, '#c8d6e5', A.w - 20);
+  ctx.globalAlpha = 1;
+  return y + 20 * u + panelScroll - A.y;
 }
 
 // ---------- touch / mouse ----------
@@ -602,13 +874,15 @@ function startFromTap() {
   if (gs === 'title' && IS_TOUCH_DEVICE && Math.min(CW, CH) < 600 && canFullscreen() && !document.fullscreenElement) toggleFullscreen();
   primary();
 }
+let panelDrag = null; // panels scroll by dragging; a tap without dragging presses a button
 cv.addEventListener('touchstart', e => {
-  e.preventDefault(); touchMode = true; ac();
+  e.preventDefault(); touchMode = true; ac(); Music.start();
   const B = touchButtons();
   for (const t of e.changedTouches) {
     const x = t.clientX, y = t.clientY;
+    if (menu) { panelDrag = { id: t.identifier, x, y, s0: panelScroll, moved: false }; continue; }
     if (hitButton(x, y)) continue;
-    if (gs !== 'play') { if (gs !== 'paused') startFromTap(); continue; }
+    if (gs !== 'play') { if (gs === 'title' || (gs === 'over' && overT > 0.9)) startFromTap(); continue; }
     if (Math.hypot(x - B.slap.x, y - B.slap.y) < B.slap.r * 1.2) { trySlap(); continue; }
     if (Math.hypot(x - B.sprint.x, y - B.sprint.y) < B.sprint.r * 1.25) { sprintTouch = t.identifier; continue; }
     const SR = slotRects();
@@ -620,21 +894,54 @@ cv.addEventListener('touchstart', e => {
 }, { passive: false });
 cv.addEventListener('touchmove', e => {
   e.preventDefault();
-  for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.x = t.clientX; joy.y = t.clientY; updJoy(); }
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) { joy.x = t.clientX; joy.y = t.clientY; updJoy(); }
+    if (panelDrag && t.identifier === panelDrag.id) {
+      const dy = t.clientY - panelDrag.y;
+      if (Math.abs(dy) > 10) panelDrag.moved = true;
+      if (panelDrag.moved) panelScroll = clamp(panelDrag.s0 - dy, 0, panelMax);
+    }
+  }
 }, { passive: false });
 function endTouch(e) {
   for (const t of e.changedTouches) {
     if (t.identifier === joy.id) { joy.id = null; joy.active = false; joy.vx = joy.vy = 0; }
     if (t.identifier === sprintTouch) sprintTouch = null;
+    if (panelDrag && t.identifier === panelDrag.id) { if (!panelDrag.moved && e.type === 'touchend') hitButton(panelDrag.x, panelDrag.y); panelDrag = null; }
   }
 }
 cv.addEventListener('touchend', endTouch);
 cv.addEventListener('touchcancel', endTouch);
+let mouseDrag = null;
 cv.addEventListener('mousedown', e => {
-  ac();
+  ac(); Music.start();
+  if (menu) { mouseDrag = { x: e.clientX, y: e.clientY, s0: panelScroll, moved: false }; return; }
   if (hitButton(e.clientX, e.clientY)) return;
-  if (gs === 'play') trySlap(); else if (gs !== 'paused') primary();
+  if (gs === 'play') trySlap(); else if (gs === 'title') primary();
 });
+window.addEventListener('mousemove', e => {
+  if (!mouseDrag || !(e.buttons & 1)) return;
+  const dy = e.clientY - mouseDrag.y;
+  if (Math.abs(dy) > 6) mouseDrag.moved = true;
+  if (mouseDrag.moved) panelScroll = clamp(mouseDrag.s0 - dy, 0, panelMax);
+});
+window.addEventListener('mouseup', () => { if (mouseDrag && !mouseDrag.moved) hitButton(mouseDrag.x, mouseDrag.y); mouseDrag = null; });
+cv.addEventListener('wheel', e => { if (menu) { panelScroll = clamp(panelScroll + e.deltaY, 0, panelMax); e.preventDefault(); } }, { passive: false });
+// menu keys run before the game's own key handler
+window.addEventListener('keydown', e => {
+  Music.start();
+  if (menu) {
+    if (e.code === 'Escape' || e.code === 'Backspace') { menu = null; persist(); }
+    if (e.code === 'ArrowDown') panelScroll = clamp(panelScroll + 60, 0, panelMax);
+    if (e.code === 'ArrowUp') panelScroll = clamp(panelScroll - 60, 0, panelMax);
+    if (e.code !== 'KeyM' && e.code !== 'KeyF' && e.code !== 'KeyG') { e.stopImmediatePropagation(); e.preventDefault(); }
+    return;
+  }
+  if (gs === 'title' || gs === 'over' || gs === 'paused') {
+    if (e.code === 'KeyB' && gs !== 'paused') { openMenu('shop'); e.stopImmediatePropagation(); }
+    else if (e.code === 'KeyN' && gs !== 'paused') { openMenu('book'); e.stopImmediatePropagation(); }
+  }
+}, true);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 if (window.visualViewport) visualViewport.addEventListener('resize', resizeAll);
 window.addEventListener('orientationchange', () => setTimeout(resizeAll, 250));

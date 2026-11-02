@@ -34,17 +34,24 @@ const GROUND_H = 460;
 const SW_TOP_END = 118, ROAD_END = 332, CENTER_LINE = 225;
 const Y_MIN = 8, Y_MAX = GROUND_H - 6;
 const LANES = [{ y: 172, dir: 1, timer: 4 }, { y: 280, dir: -1, timer: 6 }];
-const PLAYER_SPEED = 230;
-const SPRINT_SPEED = 410, SPRINT_DRAIN = 36, STAMINA_REGEN = 22;
-const STAMINA_NATURAL = 100, STAMINA_MAX = 200, WINDED_RECOVER = 25;
-const MAX_HEARTS = 8;
-const SLAP_CD = 0.4, SLAP_REACH = 52, SLAP_DEPTH = 30, CATCH_PAD = 4, MEGA_REACH = 150;
+// chasers are always measured against BASE_SPEED; the player's own speed can be upgraded in the shop
+const BASE_SPEED = 230;
+const PLAYER_BASE_SPEED = 345;   // player walk: +50% over the original 230
+const PLAYER_SPRINT_SPEED = 533; // player sprint: +30% over the original 410
+let PLAYER_SPEED = PLAYER_BASE_SPEED;
+let SPRINT_SPEED = PLAYER_SPRINT_SPEED, STAMINA_REGEN = 22;
+const SPRINT_DRAIN = 36;
+let STAMINA_NATURAL = 100, STAMINA_MAX = 200;
+const WINDED_RECOVER = 25;
+let MAX_HEARTS = 8;
+let SLAP_CD = 0.4, SLAP_REACH = 52;
+const SLAP_DEPTH = 30, CATCH_PAD = 4, MEGA_REACH = 150;
 const COMBO_WINDOW = 2.6;
 const CHUNK = 900;
-const MAX_ITEMS = 3;
+let MAX_ITEMS = 3;
 
 // the renderer keeps these up to date: left edge of the view and visible width (world units)
-let camX = -550, VW = 1100;
+let camX = -550, VW = 1100, camCX = 0; // camCX = smoothed centre the camera follows
 
 // ---------- graphics quality (auto-adapts to the device; G cycles it manually) ----------
 const QUALITY = {
@@ -509,7 +516,8 @@ let ufo = null, decoy = null, opening = null, activeEvent = null, banner = null;
 let power = {};
 const activeObs = [], activeBooths = [], activeHoles = [], activeFlocks = [];
 let lastBubbleCount = 0;
-let shake = 0, hitStop = 0, elapsed = 0, gameTime = 0;
+let shake = 0, hitStop = 0, elapsed = 0, gameTime = 0, camPunch = 0, announce = null;
+let riders = [], riderTimer = 12, coinTimer = 5, missionTick = 0;
 let score = 0, slaps = 0, combo = 0, bestCombo = 0, lastSlapT = -99, carHits = 0, boxesOpened = 0, escapes = 0;
 let overT = 0, dyingT = 0, newBest = false, boxTimer = 0, eventTimer = 0, heartTimer = 0, nextEscapeHeart = 6, curDistrict = 'shops';
 let best = 0;
@@ -551,7 +559,7 @@ function newPlayer() {
   return {
     isPlayer: true, x: 0, y: 225, z: 0, vx: 0, vy: 0, r: 13, size: 1, facing: 1, phase: 0, moveAmt: 0,
     slapT: 0, slapCd: 0, sprinting: false, winded: false, stamina: STAMINA_NATURAL, hearts: MAX_HEARTS, invuln: 0,
-    downT: 0, lie: 0, kvx: 0, fallDir: 1, look: PLAYER_LOOK, state: 'player', blockT: 0, shock: 0, happyT: 0, bananaT: 0,
+    downT: 0, lie: 0, kvx: 0, fallDir: 1, look: playerLook(), burstT: 0, trailT: 0, state: 'player', blockT: 0, shock: 0, happyT: 0, bananaT: 0,
     hidden: false, hideT: 0, seenT: 0, creamT: 0,
   };
 }
@@ -568,11 +576,13 @@ function refreshObs() {
   if (truck) activeObs.push(truck.ob);
 }
 function reset() {
+  applyUpgrades();
   player = newPlayer();
+  riders = []; riderTimer = 12; coinTimer = 5; announce = null; camPunch = 0;
   peds = []; cars = []; parts = []; pops = []; items = []; bananas = []; inventory = []; pies = []; tornados = [];
   truck = null; ufo = null; decoy = null; opening = null; activeEvent = null; banner = null;
   resetPowers();
-  camX = player.x - VW / 2;
+  camCX = player.x; camX = player.x - VW / 2;
   elapsed = 0; score = 0; slaps = 0; combo = 0; bestCombo = 0; lastSlapT = -99; carHits = 0; boxesOpened = 0; escapes = 0;
   overT = 0; newBest = false; boxTimer = 6; eventTimer = 20; heartTimer = 14; nextEscapeHeart = 6; curDistrict = districtAt(player.x);
   for (const c of chunks.values()) for (const f of c.flocks) f.scatterT = -99;
@@ -584,7 +594,23 @@ function reset() {
     addPed(x, sidewalkY(), randTypeAt(x));
   }
 }
-function startGame() { reset(); gs = 'play'; }
+function startGame() {
+  reset(); gs = 'play';
+  missionsStartRun();
+  Music.start();
+  if (lvl('headstart')) { let k; do { k = rollPower(); } while (POWERS[k].instant); inventory.push(k); popup(player.x, player.y, 120, 'HEAD START: ' + POWERS[k].name, POWERS[k].color, 15, 2); }
+}
+// chasers get a little quicker the longer a run lasts, so upgrades never make you untouchable
+const difficultySpeed = () => 1 + Math.min(0.12, elapsed / 1500);
+function addEscape() { escapes++; addCoins(3); missionEvent('escape'); }
+function closeCall(x, y) {
+  if (gs !== 'play' || player.downT > 0) return;
+  runClose++;
+  const pts = addScore(50); addCoins(2);
+  player.stamina = Math.min(STAMINA_MAX, player.stamina + 8);
+  popup(x, y, 120, 'CLOSE CALL! +' + pts, '#48dbfb', 17, 1.0, true);
+  sfx.close(); missionEvent('close');
+}
 const onScreen = q => q.x - camX > -40 && q.x - camX < VW + 40;
 function addScore(pts) {
   const m = activeEvent && activeEvent.key === 'happyhour' ? 2 : 1;
@@ -690,6 +716,7 @@ function getInput() {
 }
 const sprintHeld = () => !!(keys.ShiftLeft || keys.ShiftRight || keys.KeyK || sprintTouch !== null);
 function primary() {
+  if (typeof menu !== 'undefined' && menu) return; // a shop/book/settings panel is open
   if (gs === 'title') startGame();
   else if (gs === 'over') { if (overT > 0.9) startGame(); }
   else if (gs === 'paused') gs = 'play';
@@ -771,7 +798,7 @@ function knockDown(q, dir, force, time) {
 function startChase(q, angerSec) {
   q.state = 'chase'; q.ramp = 0.3; q.angryAfter = true;
   if (angerSec) q.angerMax = angerSec * q.T.anger;
-  if (!q.chaseSpeed) q.chaseSpeed = PLAYER_SPEED * q.T.chase * rand(0.96, 1.05);
+  if (!q.chaseSpeed) q.chaseSpeed = BASE_SPEED * q.T.chase * difficultySpeed() * rand(0.96, 1.05);
   q.anger = q.angerMax;
   q.photoT = q.mimeT = q.danceT = q.shock = 0;
 }
@@ -783,11 +810,16 @@ function slapHit(q, dir) {
   knockDown(q, dir, 340, Math.max(0.6, 1.9 * T.down * Math.pow(0.75, q.slaps - 1)));
   const base = Math.min(10, 5.5 + elapsed / 45);
   q.angerMax = (base + (q.slaps - 1) * 2.2) * T.anger;
-  q.chaseSpeed = PLAYER_SPEED * T.chase * (1 + 0.05 * Math.min(6, q.slaps - 1)) * rand(0.96, 1.05);
+  q.chaseSpeed = BASE_SPEED * T.chase * difficultySpeed() * (1 + 0.05 * Math.min(6, q.slaps - 1)) * rand(0.96, 1.05);
 
   combo = (elapsed - lastSlapT < COMBO_WINDOW) ? Math.min(8, combo + 1) : 1;
   lastSlapT = elapsed;
   bestCombo = Math.max(bestCombo, combo);
+  addCoins(1 + (combo >= 3 ? 1 : 0)); bookSlap(q.type);
+  missionEvent('slap', 1, { type: q.type }); missionEvent('combo', combo);
+  const ann = { 3: 'TRIPLE SLAP!', 5: 'SLAP-TASTIC!', 8: 'UNSTOPPABLE!' }[combo];
+  if (ann && (!announce || announce.text !== ann)) { announce = { text: ann, t: 1.1, max: 1.1 }; sfx.announce(); }
+  p.burstT = lvl('burst') ? 0.6 : 0; camPunch = Math.max(camPunch, 0.035);
   let nc = 0;
   for (const o of peds) if (o !== q && o.state === 'chase') nc++;
   let mult = combo * (1 + 0.5 * nc);
@@ -850,12 +882,13 @@ function hurtPlayer(src) {
   }
   p.hearts--; p.invuln = 3.0; p.downT = 0.9; p.sprinting = false; p.hidden = false;
   p.fallDir = src.x < p.x ? 1 : -1; p.kvx = p.fallDir * 280;
-  shake = 16; hitStop = 0.09; sfx.slap(); sfx.hurt(); buzz([60, 40, 60]);
+  shake = 16; hitStop = 0.09; camPunch = 0.07; sfx.slap(); sfx.hurt(); buzz([60, 40, 60]);
   popup(p.x, p.y, 96, src.type === 'dog' ? 'CHOMP!' : 'OUCH!', '#ff4757', 30, 1.0, true);
   if (p.hearts <= 0) {
-    gs = 'dying'; dyingT = 1.8; p.downT = 999; sfx.over();
+    gs = 'dying'; dyingT = 1.8; p.downT = 999; sfx.over(); camPunch = 0.1;
+    endRun();
     newBest = score > best;
-    if (newBest) { best = score; try { localStorage.setItem('slaprun_best', String(best)); } catch (e) { } }
+    if (newBest) best = score; // saved per player profile by endRun()
     for (const q of peds) if (q.state === 'chase') { q.state = 'revenge'; q.timer = rand(0.3, 1.0); q.decoyHit = false; }
   }
   return true;
@@ -872,7 +905,7 @@ function pacify(q, kind, pts, label, color) {
   toWalk(q, true);
   if (kind) say(q, kind, true);
   if (was && pts) {
-    escapes++;
+    addEscape();
     const got = addScore(pts);
     popup(q.x, q.y, 96, label + ' +' + got, color, 16, 1.1);
   }
@@ -896,6 +929,7 @@ function spawnBox(x, y) {
   items.push({ kind: 'box', x: tmp.x, y: clamp(tmp.y, Y_MIN + 6, Y_MAX - 6), z: rand(260, 380), vz: 0, life: 30, bob: Math.random() * 6 });
 }
 function openBox() {
+  missionEvent('box');
   if (opening) finishOpening();
   opening = { t: 0.75, result: rollPower() };
   boxesOpened++;
@@ -951,7 +985,7 @@ function applyPower(k) {
       for (let i = 0; i < 40; i++) fx('cash', p.x + rand(-260, 260), p.y + rand(-120, 120), rand(150, 320), { vx: rand(-20, 20), vy: 0, vz: rand(-30, 0), g: 40, life: rand(2, 3.5), size: 7, color: '#2ecc71' });
       for (const q of chasersNear(650)) {
         distract(q, p.x + rand(-220, 220), p.y + rand(-100, 100), 5.5, 'money');
-        escapes++; const got = addScore(100); popup(q.x, q.y, 96, 'DISTRACTED +' + got, '#2ecc71', 15, 1.1);
+        addEscape(); const got = addScore(100); popup(q.x, q.y, 96, 'DISTRACTED +' + got, '#2ecc71', 15, 1.1);
       }
       break;
     }
@@ -1010,7 +1044,7 @@ function summonUfo() {
 }
 function airHorn() {
   const p = player;
-  sfx.airhorn(); shake = 16;
+  sfx.airhorn(); shake = 16; camPunch = 0.08;
   fx('ring', p.x, p.y, 0, { r: 20, grow: 700, life: 0.5, color: '#ff9f43' });
   let n = 0;
   for (const q of peds) {
@@ -1039,9 +1073,12 @@ function updateItems(dt) {
     it.vz -= 900 * dt; it.z += it.vz * dt;
     if (it.z < 0) { it.z = 0; it.vz = it.vz < -120 ? -it.vz * 0.35 : 0; }
     if (it.life <= 0 || Math.abs(it.x - player.x) > 1800) { items.splice(i, 1); continue; }
-    if (gs === 'play' && player.downT <= 0 && it.z < 20 && Math.hypot(it.x - player.x, it.y - player.y) < 32) {
+    const d = Math.hypot(it.x - player.x, it.y - player.y), magnetic = it.kind !== 'box';
+    if (magnetic && gs === 'play' && it.z < 20 && d < magnetRange() * 2.2 && d > 1) { const pull = Math.min(d, 420 * dt); it.x += (player.x - it.x) / d * pull; it.y += (player.y - it.y) / d * pull; }
+    if (gs === 'play' && player.downT <= 0 && it.z < 20 && d < (magnetic ? magnetRange() : 32)) {
       items.splice(i, 1);
-      if (it.kind === 'box') openBox();
+      if (it.kind === 'coin') { const g = addCoins(it.value || 2); sfx.coin(); popup(it.x, it.y, 60, '+' + g, '#ffd32a', 12, 0.6); fx('star', it.x, it.y, 30, { vz: 80, life: 0.4, size: 4, color: '#ffd32a' }); }
+      else if (it.kind === 'box') openBox();
       else healPlayer(it.kind === 'medkit' ? 'FIRST AID! +1 HEART' : it.kind === 'pizza' ? 'PIZZA! +1 HEART' : '+1 HEART');
     }
   }
@@ -1066,7 +1103,7 @@ function updatePowers(dt) {
       knockDown(q, q.vx >= 0 ? 1 : -1, 220, wasChase ? 1.5 : 1.2);
       q.angryAfter = wasChase;
       sfx.slip();
-      if (wasChase) { q.angerMax = Math.max(3, keep) + 1.5; const pts = addScore(150); popup(q.x, q.y, 90, 'SLIPPED! +' + pts, '#ffd32a', 18, 1.1, true); }
+      if (wasChase) { missionEvent('slip'); q.angerMax = Math.max(3, keep) + 1.5; const pts = addScore(150); popup(q.x, q.y, 90, 'SLIPPED! +' + pts, '#ffd32a', 18, 1.1, true); }
       else popup(q.x, q.y, 90, 'WHOA!', '#ffd32a', 16, 0.9);
       bananas.splice(i, 1);
       break;
@@ -1134,7 +1171,7 @@ function updateUfo(dt) {
     t.x += (ufo.x - t.x) * Math.min(1, dt * 6);
     t.z += 330 * dt;
     if (t.z >= ufo.alt - 20) {
-      removePed(t); escapes++;
+      removePed(t); addEscape(); missionEvent('abduct');
       const pts = addScore(300);
       popup(ufo.x, ufo.y, ufo.alt - 40, 'ABDUCTED! +' + pts, '#7bed9f', 20, 1.2, true);
       ufo.target = null; ufo.state = 'seek';
@@ -1160,7 +1197,7 @@ function updateStreet(dt) {
         const spotted = peds.some(q => q.state === 'chase' && Math.hypot(q.x - p.x, q.y - p.y) < 110);
         if (spotted) { if (p.seenT <= 0) { popup(p.x, p.y, 110, 'THEY SAW YOU!', '#ff6b6b', 16, 1.0); p.seenT = 1.2; } }
         else {
-          p.hidden = true; sfx.hide();
+          p.hidden = true; sfx.hide(); missionEvent('hide');
           popup(p.x, p.y, 110, 'HIDDEN!', '#dfe6e9', 18, 1.0, true);
           for (const q of peds) if (q.state === 'chase') say(q, 'lost');
         }
@@ -1175,7 +1212,7 @@ function updateStreet(dt) {
       const wasChase = q.state === 'chase';
       q.state = 'fell'; q.timer = 0.7; q.x = h.x; q.y = h.y; q.say = null;
       sfx.splash();
-      if (wasChase && gs === 'play') { escapes++; const got = addScore(200); popup(h.x, h.y, 70, 'SPLOOSH! +' + got, '#48dbfb', 20, 1.2, true); }
+      if (wasChase && gs === 'play') { addEscape(); missionEvent('manhole'); const got = addScore(200); popup(h.x, h.y, 70, 'SPLOOSH! +' + got, '#48dbfb', 20, 1.2, true); }
       else popup(h.x, h.y, 70, 'OOPS!', '#48dbfb', 16, 1.0);
     }
   }
@@ -1215,7 +1252,7 @@ function spawnTruck() {
       if (isFlat(q)) continue;
       distract(q, x + rand(-70, 70), y + rand(30, 70), rand(9, 11), 'icecream');
       q.look.icecream = true;
-      escapes++; const got = addScore(100); popup(q.x, q.y, 96, 'ICE CREAM BREAK +' + got, '#fd79a8', 14, 1.1);
+      addEscape(); const got = addScore(100); popup(q.x, q.y, 96, 'ICE CREAM BREAK +' + got, '#fd79a8', 14, 1.1);
     } else if (q.state === 'walk' && Math.abs(q.x - x) < 350 && chance(0.5)) {
       distract(q, x + rand(-80, 80), y + rand(30, 80), rand(5, 9), null);
       q.look.icecream = true;
@@ -1275,11 +1312,12 @@ function updateEvents(dt) {
   boxTimer -= dt;
   if (boxTimer <= 0) {
     if (items.filter(it => it.kind === 'box').length < 3) spawnBox();
-    boxTimer = rand(9, 14);
+    boxTimer = rand(9, 14) * boxIntervalMult();
   }
   const d = districtAt(player.x);
   if (d !== curDistrict) {
     curDistrict = d;
+    missionEvent('district', 1, { district: d });
     if (!banner) showBanner(DISTRICTS[d].name, DISTRICTS[d].sub, '#ffffff', 2.2);
   }
 }
@@ -1307,11 +1345,19 @@ function updatePlayer(dt) {
     const sprint = gs === 'play' && sprintHeld() && moving && !p.winded && (p.stamina > 0 || infinite);
     if (sprint && !p.sprinting) sfx.sprint();
     p.sprinting = sprint;
-    const boost = power.skates > 0 ? 1.55 : 1;
+    p.burstT = Math.max(0, p.burstT - dt);
+    const boost = (power.skates > 0 ? 1.55 : 1) * (p.burstT > 0 ? 1 + 0.07 * lvl('burst') : 1);
     const spd = (sprint ? SPRINT_SPEED : PLAYER_SPEED) * boost;
     vx = ix * spd; vy = iy * spd * 0.82;
     if (sprint && !infinite) p.stamina = Math.max(0, p.stamina - SPRINT_DRAIN * dt);
     if ((sprint || power.skates > 0) && Math.random() < 0.5) dust(p.x, p.y, 1);
+    p.trailT -= dt;
+    if (save.eq.trail !== 'trail_none' && moving && p.trailT <= 0) {
+      p.trailT = 0.05;
+      const tr = save.eq.trail;
+      const col = tr === 'trail_flame' ? pick(['#ff9f1a', '#ff4757', '#ffd32a']) : tr === 'trail_rainbow' ? 'hsl(' + ((gameTime * 360) % 360) + ',95%,60%)' : pick(['#ffffff', '#ffeaa7', '#81ecec']);
+      fx(tr === 'trail_sparkle' ? 'star' : 'trail', p.x - p.facing * 10 + rand(-5, 5), p.y + rand(-4, 4), rand(5, 25), { vz: tr === 'trail_flame' ? 60 : 10, life: 0.5, size: tr === 'trail_sparkle' ? 3 : 4.5, color: col });
+    }
     if (ix !== 0 && p.slapT <= 0) p.facing = ix > 0 ? 1 : -1;
   }
   if (!p.sprinting && p.stamina < STAMINA_NATURAL) p.stamina = Math.min(STAMINA_NATURAL, p.stamina + STAMINA_REGEN * dt);
@@ -1325,6 +1371,7 @@ function updatePlayer(dt) {
 
 // ---------- update: NPCs ----------
 function walkBehaviour(q, dt) {
+  if (q.dodgeT > 0) { q.dodgeT -= dt; return [0, q.dodgeDir * 170]; }
   if (q.danceT > 0) { q.danceT -= dt; return [0, 0]; }
   if (q.shock > 0) { q.facing = player.x > q.x ? 1 : -1; return [0, 0]; }
   if (q.photoT > 0) {
@@ -1392,14 +1439,18 @@ function chaseBehaviour(q, dt) {
   }
   if (!decoy && !lostTrack) {
     const pd = Math.hypot(player.x - q.x, player.y - q.y);
+    q.closeCd = Math.max(0, (q.closeCd || 0) - dt);
+    if (pd < q.r + player.r + CATCH_PAD + 14 && player.invuln <= 0) q.nearT = 0.8;
+    else if (q.nearT > 0) { q.nearT -= dt; if (pd > 80 && q.closeCd <= 0) { q.nearT = 0; q.closeCd = 4; closeCall(player.x, player.y); } }
     if (pd < q.r + player.r + CATCH_PAD && hurtPlayer(q)) {
+      q.nearT = 0;
       q.state = 'revenge'; q.timer = 0.7; q.slapT = q.type === 'dog' ? 0 : 0.25;
       return [0, 0];
     }
   }
   if (q.state === 'chase') {
-    if (q.anger <= 0) { q.state = 'tired'; q.timer = 2.2; escapes++; if (chance(0.6)) say(q, 'tired', true); }
-    else if (Math.abs(q.x - player.x) > 1500) { toWalk(q, false); escapes++; }
+    if (q.anger <= 0) { q.state = 'tired'; q.timer = 2.2; addEscape(); if (chance(0.6)) say(q, 'tired', true); }
+    else if (Math.abs(q.x - player.x) > 1500) { toWalk(q, false); addEscape(); }
   }
   return [vx, vy];
 }
@@ -1559,6 +1610,7 @@ function updateCars(dt) {
       if (ahead > 0 && ahead < 450 && Math.abs(player.y - c.y) < c.depth / 2 + 30) { c.honked = true; sfx.horn(); }
     }
     const hx = c.len / 2, hy = c.depth / 2;
+    if (!c.passed && (player.x - c.x) * c.dir < -hx) { c.passed = true; const dy = Math.abs(player.y - c.y); if (dy >= hy + 4 && dy < hy + 42 && player.invuln <= 0) closeCall(player.x, player.y); }
     if (Math.abs(player.x - c.x) < hx + player.r && Math.abs(player.y - c.y) < hy + 4) {
       if (hurtPlayer(c)) {
         player.fallDir = c.dir; player.kvx = c.dir * 650; sfx.crash();
@@ -1575,7 +1627,7 @@ function updateCars(dt) {
         if (wasChase) q.angerMax = Math.max(3, keep) + 2;
         sfx.crash();
         if (wasChase && gs === 'play') {
-          const pts = addScore(250); carHits++;
+          const pts = addScore(250); carHits++; missionEvent('traffic');
           popup(q.x, q.y, 100, 'BEEP BEEP! +' + pts, '#48dbfb', 22, 1.3, true);
         }
       }
@@ -1611,12 +1663,85 @@ function update(dt) {
   updatePlayer(dt);
   if (gs === 'play') trySlap(true); // auto-slap anyone you run into
   updatePeds(dt);
-  if (gs !== 'title') { updateCars(dt); updateItems(dt); updatePowers(dt); updateUfo(dt); updateStreet(dt); updateEvents(dt); }
+  if (gs !== 'title') { updateCars(dt); updateRiders(dt); updateItems(dt); updatePowers(dt); updateUfo(dt); updateStreet(dt); updateEvents(dt); updateMeta(dt); }
   separate();
   managePeds();
   updateFx(dt);
+  // camera follow lives in the game logic so spawning works even if nothing is drawn
+  const ctx0 = player.x + player.facing * 50;
+  if (Math.abs(ctx0 - camCX) > 1500) camCX = ctx0; else camCX += (ctx0 - camCX) * Math.min(1, dt * 4);
+  camX = camCX - VW / 2;
   shake = Math.max(0, shake - dt * 40);
+  camPunch = Math.max(0, camPunch - dt * 0.3);
   if (combo > 0 && elapsed - lastSlapT > COMBO_WINDOW) combo = 0;
   if (gs === 'dying') { dyingT -= dt; if (dyingT <= 0) { gs = 'over'; overT = 0; } }
   else if (gs === 'over') overT += dt;
+}
+
+// ---------- e-bikes & scooters: fast sidewalk hazards ----------
+const RIDER_LANES = [64, 392];
+function spawnRider() {
+  const dir = chance(0.5) ? 1 : -1, kind = chance(0.6) ? 'ebike' : 'scooter';
+  riders.push({
+    x: dir > 0 ? camX - 260 : camX + VW + 260, y: pick(RIDER_LANES) + rand(-6, 6), dir, kind,
+    speed: kind === 'ebike' ? rand(330, 420) : rand(260, 330), rang: false, passed: false, wheel: 0,
+    color: pick(['#e74c3c', '#00b894', '#fdcb6e', '#0984e3', '#e056fd']), skin: pick(SKINS),
+  });
+}
+function updateRiders(dt) {
+  if (gs === 'play') {
+    const m = { downtown: 0.6, shops: 0.85, park: 1, residential: 1.3 }[curDistrict] || 1;
+    riderTimer -= dt;
+    if (riderTimer <= 0) { spawnRider(); riderTimer = rand(5, 10) * m * Math.max(0.6, 1 - elapsed / 300); }
+  }
+  const p = player;
+  for (let i = riders.length - 1; i >= 0; i--) {
+    const r = riders[i];
+    r.x += r.dir * r.speed * dt; r.wheel += r.speed * dt / 9;
+    const ahead = (p.x - r.x) * r.dir, dy = Math.abs(p.y - r.y);
+    if (!r.rang && ahead > 0 && ahead < 520 && dy < 60 && gs === 'play') { r.rang = true; sfx.bell(); }
+    if (!r.passed && ahead < -20) { r.passed = true; if (dy >= 16 && dy < 50 && p.invuln <= 0) closeCall(p.x, p.y); }
+    if (Math.abs(p.x - r.x) < 24 && dy < 16 && hurtPlayer(r)) {
+      p.fallDir = r.dir; p.kvx = r.dir * 420; sfx.crash();
+      popup(p.x, p.y, 130, 'BIKE!', '#feca57', 22, 1.0);
+    }
+    for (const q of peds) {
+      if (q.type === 'dog' || isFlat(q) || isGone(q) || q.state === 'frozen') continue;
+      const qa = (q.x - r.x) * r.dir, qdy = Math.abs(q.y - r.y);
+      if (q.state === 'walk' && qa > 0 && qa < 170 && qdy < 22 && !(q.dodgeT > 0)) { q.dodgeT = 0.45; q.dodgeDir = q.y >= r.y ? 1 : -1; }
+      if (Math.abs(q.x - r.x) < 22 + q.r && qdy < 14) {
+        const wasChase = q.state === 'chase', keep = q.anger;
+        knockDown(q, r.dir, 480, 1.7);
+        q.angryAfter = wasChase;
+        sfx.crash();
+        if (wasChase && gs === 'play') {
+          q.angerMax = Math.max(3, keep) + 1;
+          missionEvent('bike');
+          const pts = addScore(200); popup(q.x, q.y, 100, 'WIPEOUT! +' + pts, '#fdcb6e', 18, 1.1, true);
+        }
+      }
+    }
+    if ((r.dir > 0 && r.x > camX + VW + 700) || (r.dir < 0 && r.x < camX - 700)) riders.splice(i, 1);
+  }
+}
+// ---------- coins, toasts, announcer, background mission ticks ----------
+function spawnCoinTrail() {
+  const side = chance(0.75) ? player.facing : -player.facing;
+  const x0 = player.x + side * rand(220, 520);
+  const lane = chance(0.35) ? rand(150, 300) : sidewalkY(); // road trails are riskier
+  const n = 5 + ((Math.random() * 4) | 0);
+  for (let i = 0; i < n; i++) items.push({ kind: 'coin', x: x0 + side * i * 38, y: clamp(lane + Math.sin(i * 0.8) * 12, Y_MIN + 6, Y_MAX - 6), z: 0, vz: 0, life: 22, value: lane > SW_TOP_END && lane < ROAD_END ? 3 : 2 });
+}
+function updateMeta(dt) {
+  for (let i = toasts.length - 1; i >= 0; i--) { toasts[i].t -= dt; if (toasts[i].t <= 0) toasts.splice(i, 1); }
+  if (announce) { announce.t -= dt; if (announce.t <= 0) announce = null; }
+  if (gs !== 'play') return;
+  coinTimer -= dt;
+  if (coinTimer <= 0) { coinTimer = rand(7, 12); if (items.filter(it => it.kind === 'coin').length < 14) spawnCoinTrail(); }
+  missionTick -= dt;
+  if (missionTick <= 0) {
+    missionTick = 1;
+    let nc = 0; for (const q of peds) if (q.state === 'chase') nc++;
+    missionEvent('heat', nc); missionEvent('time', Math.floor(elapsed));
+  }
 }

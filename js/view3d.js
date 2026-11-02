@@ -550,11 +550,12 @@ const V = (() => {
     R.arms = [];
     const sleeve = (L.top === 'tank' || L.top === 'dress') ? null : (L.top === 'vest' ? shirt2 : shirt);
     const handMatA = mat(L.gloves ? '#ffffff' : L.skin);
+    const goldMat = L.goldGlove ? mat('#f1c40f') : null;
     for (const side of [-1, 1]) {
       const piv = new THREE.Group(); piv.position.set(0, 26, side * (tw / 2 + 3.4)); up.add(piv);
       if (sleeve) mesh(cyl(3.9, 3.6, 14, 8), sleeve, 0, -6, 0, piv);
       mesh(cyl(3.1, 2.9, 22, 8), skin, 0, -12, 0, piv);
-      mesh(sph(4.3, 10, 8), handMatA, 0, -25, 0, piv);
+      mesh(sph(L.goldGlove && side === 1 ? 5.6 : 4.3, 10, 8), L.goldGlove && side === 1 ? goldMat : handMatA, 0, -25, 0, piv);
       const hand = new THREE.Group(); hand.position.y = -25; piv.add(hand);
       R.arms.push(piv);
       if (side === -1) R.handB = hand; else R.handF = hand;
@@ -655,6 +656,9 @@ const V = (() => {
       case 'sunhat': cap(12.7, hat, 0.1); mesh(cyl(23, 23, 1.4, 20), hat, 0, 5.5, 0, head); mesh(cyl(12.9, 12.9, 2.5, 16, true), mat('#e17055', { side: THREE.DoubleSide }), 0, 7.5, 0, head); break;
       case 'toque': mesh(cyl(10, 11, 20, 14), mat('#ffffff'), 0, 17, 0, head); for (const [x, z] of [[-5, 0], [5, 0], [0, 5], [0, -5]]) mesh(sph(7.5, 10, 8), mat('#ffffff'), x, 28, z, head); mesh(cyl(12.4, 12.4, 4, 16), mat('#ecf0f1'), 0, 7, 0, head); break;
       case 'beret': { const b = mesh(sph(13.5, 14, 8), hat, -1, 10, 0, head); b.scale.set(1, 0.35, 1); b.rotation.z = 0.25; break; }
+      case 'cowboy': mesh(cyl(24, 24, 1.6, 20), hat, 0, 5, 0, head).scale.set(1, 1, 0.8); mesh(cyl(11, 13, 14, 16), hat, -1, 12, 0, head); mesh(cyl(13.2, 13.2, 3, 16), mat('#3e2723'), -1, 7, 0, head); break;
+      case 'tophat': mesh(cyl(18, 18, 1.6, 20), hat, 0, 6, 0, head); mesh(cyl(11, 11, 24, 16), hat, 0, 18, 0, head); mesh(cyl(11.3, 11.3, 4, 16), mat('#c0392b'), 0, 9, 0, head); break;
+      case 'crown': cap(12.9, hm); mesh(cyl(12, 12, 8, 16, true), mat('#f1c40f', { side: THREE.DoubleSide }), 0, 12, 0, head); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; mesh(cone(2.6, 7, 6), mat('#f1c40f'), Math.cos(a) * 11, 19, Math.sin(a) * 11, head); mesh(sph(1.4, 6, 4), mat(i % 2 ? '#e74c3c' : '#0984e3'), Math.cos(a) * 12, 12, Math.sin(a) * 12, head); } break;
       case 'hardhat': cap(13.8, hat, 0.05, 0.55); mesh(cyl(15.5, 15.5, 1.4, 18), hat, 1.5, 4, 0, head); mesh(box(18, 2.5, 3), mat(shadeHex(L.hat, -30)), 0, 13, 0, head); break;
     }
   }
@@ -904,6 +908,52 @@ const V = (() => {
     g.userData.shadow = blob(12, g);
     return g;
   }
+  const coinMat = new THREE.MeshToonMaterial({ color: 0xffd32a, gradientMap: grad, emissive: new THREE.Color('#f39c12'), emissiveIntensity: 0.4 });
+  function buildCoin() {
+    const g = new THREE.Group();
+    const c = mesh(cyl(8, 8, 2.4, 16), coinMat, 0, 12, 0, g); c.rotation.x = Math.PI / 2; g.userData.spin = c;
+    mesh(box(2, 8, 2.8), mat('#e1a32a'), 0, 0, 0, c).rotation.x = -Math.PI / 2;
+    g.userData.shadow = blob(7, g);
+    return g;
+  }
+  function buildRider(r) {
+    const g = new THREE.Group();
+    const bike = new THREE.Group(); g.add(bike);
+    const dark = mat('#2d3436'), jacket = mat(r.color), skin = mat(r.skin);
+    g.userData.wheels = [];
+    if (r.kind === 'ebike') {
+      for (const x of [-20, 20]) { const w = mesh(torus(9, 2.2), dark, x, 10, 0, bike); g.userData.wheels.push(w); }
+      mesh(box(42, 3, 3), mat('#636e72'), 0, 16, 0, bike).rotation.z = 0.12;
+      mesh(box(3, 26, 3), mat('#636e72'), 16, 22, 0, bike).rotation.z = -0.3;
+      mesh(box(3, 3, 18), dark, 20, 34, 0, bike);
+      mesh(box(10, 3, 7), dark, -6, 26, 0, bike);
+      mesh(box(22, 20, 20), jacket, -20, 36, 0, bike); // delivery box
+      mesh(box(22.4, 4, 20.4), mat('#ffffff'), -20, 40, 0, bike);
+      mesh(box(6, 16, 10), mat('#2d3436'), -2, 16, 0, bike); // battery
+      // seated rider
+      for (const z of [-5, 5]) { const l = mesh(box(16, 5, 5), mat('#2d3436'), 2, 26, z, g); l.rotation.z = -0.3; mesh(box(5, 14, 5), mat('#2d3436'), 9, 18, z, g); }
+      mesh(box(14, 26, 14), jacket, 0, 41, 0, g).rotation.z = -0.35;
+      for (const z of [-8, 8]) mesh(box(20, 4, 4), jacket, 11, 46, z, g).rotation.z = -0.4;
+      mesh(sph(9, 12, 10), skin, 8, 60, 0, g);
+      mesh(dome(10.5, 0.55), mat('#2d3436'), 7, 61, 0, g);
+    } else {
+      for (const x of [-14, 14]) { const w = mesh(cyl(5, 5, 4, 12), dark, x, 5, 0, bike); w.rotation.x = Math.PI / 2; g.userData.wheels.push(w); }
+      mesh(box(34, 3, 11), mat('#636e72'), 0, 9, 0, bike);
+      mesh(box(3, 46, 3), mat('#636e72'), 16, 32, 0, bike).rotation.z = -0.15;
+      mesh(box(3, 3, 20), dark, 19, 55, 0, bike);
+      // standing rider
+      for (const z of [-4, 4]) mesh(box(5, 30, 5), mat('#34495e'), z * 0.5, 25, z, g);
+      mesh(box(13, 26, 14), jacket, 2, 52, 0, g).rotation.z = -0.15;
+      for (const z of [-8, 8]) mesh(box(18, 4, 4), jacket, 10, 58, z, g).rotation.z = -0.2;
+      mesh(sph(9, 12, 10), skin, 6, 73, 0, g);
+      mesh(dome(10.5, 0.55), mat(r.color), 5, 74, 0, g);
+    }
+    for (const w of g.userData.wheels) w.userData.dyn = true;
+    mergePerGroup(g, (g.userData.own = []));
+    g.userData.shadow = blob(16, g, 2.2);
+    g.rotation.y = r.dir > 0 ? 0 : Math.PI;
+    return g;
+  }
   function buildBanana() {
     const g = new THREE.Group();
     const b = mesh(torus(7, 2.6, Math.PI * 0.9), mat('#f6c90e'), 0, 3, 0, g);
@@ -951,6 +1001,7 @@ const V = (() => {
       scene.remove(o);
       if (r.o.skinMat) r.o.skinMat.dispose();
       if (r.o.own) for (const g of r.o.own) g.dispose();
+      if (r.o.userData && r.o.userData.own) for (const g of r.o.userData.own) g.dispose();
       live.delete(obj);
     }
   }
@@ -999,9 +1050,7 @@ const V = (() => {
   function frame(dt) {
     frameId++;
     // camera follows the player
-    const tx = player.x + player.facing * 50;
-    if (!inited || Math.abs(tx - cx) > 1500) { cx = tx; inited = true; }
-    cx += (tx - cx) * Math.min(1, dt * 4);
+    cx = camCX;
     // framing adapts to the screen shape: wide desktop -> square foldable/tablet -> tall phone
     const aspect = CWv / CHv, tanH = Math.tan(FOV / 2 * Math.PI / 180);
     const tall = clamp((1.35 - aspect) / (1.35 - 0.5), 0, 1); // 0 = landscape, 1 = tall portrait
@@ -1013,6 +1062,7 @@ const V = (() => {
     if (2 * camDist * tanH * aspect > 1400) camDist = 1400 / (2 * tanH * aspect); // ultra-wide: move in closer
     VW = 2 * camDist * tanH * aspect;
     camX = cx - VW / 2;
+    camDist *= 1 - camPunch;
     const target = _w.set(cx, 30, lerp(185, 235, tall));
     camera.position.copy(target).addScaledVector(camDir, camDist);
     if (shake > 0) { camera.position.x += rand(-shake, shake) * 0.7; camera.position.y += rand(-shake, shake) * 0.7; }
@@ -1049,12 +1099,18 @@ const V = (() => {
       for (const w of g.userData.wheels) w.rotation.y = c.wheel;
     }
     if (truck) { const g = track(truck, buildTruck); g.position.set(truck.x, 0, truck.y); }
+    for (const r of riders) {
+      if (Math.abs(r.x - cx) > VW * 0.5 + 700) continue;
+      const g = track(r, buildRider);
+      g.position.set(r.x, 0, r.y);
+      for (const w of g.userData.wheels) { if (r.kind === 'ebike') w.rotation.z = -r.wheel; else w.rotation.y = r.wheel; }
+    }
     for (const it of items) {
-      const g = track(it, it.kind === 'box' ? buildBox : it.kind === 'heart' ? buildHeartItem : it.kind === 'medkit' ? buildMedkit : buildPizza);
+      const g = track(it, it.kind === 'box' ? buildBox : it.kind === 'heart' ? buildHeartItem : it.kind === 'medkit' ? buildMedkit : it.kind === 'coin' ? buildCoin : buildPizza);
       g.position.set(it.x, it.z, it.y);
       if (g.userData.spin) {
         g.userData.spin.rotation.y = gameTime * 2.5;
-        g.userData.spin.position.y = (it.kind === 'heart' ? 22 : 14) + Math.sin(gameTime * 4 + it.x) * 3;
+        g.userData.spin.position.y = (it.kind === 'heart' ? 22 : it.kind === 'coin' ? 12 : 14) + Math.sin(gameTime * 4 + it.x) * 3;
         g.userData.shadow.position.y = -it.z + 0.6;
       } else if (it.kind === 'box') {
         g.userData.chute.visible = it.z > 30;
@@ -1094,7 +1150,7 @@ const V = (() => {
     const sample = { look: Object.assign({}, PLAYER_LOOK), facing: 1, size: 1 };
     const R = buildRig(sample);
     const parts = [R.root, buildDog({ look: makeDogLook(), facing: 1 }).root, buildBox(), buildHeartItem(), buildMedkit(), buildPizza(), buildBanana(), buildUfo(), buildTornado(), buildPie(), buildTruck(),
-      buildCar({ len: 150, depth: 56, h: 46, color: '#e74c3c', dir: 1, taxi: true }), leashLine()];
+      buildCar({ len: 150, depth: 56, h: 46, color: '#e74c3c', dir: 1, taxi: true }), buildCoin(), buildRider({ kind: 'ebike', dir: 1, color: '#e74c3c', skin: '#e8b48f' }), buildRider({ kind: 'scooter', dir: -1, color: '#0984e3', skin: '#8d5524' }), leashLine()];
     for (const o of parts) { if (o.parent) o.parent.remove(o); W.add(o); }
     W.traverse(o => { o.visible = true; });
     W.position.set(cx, 0, 200);
