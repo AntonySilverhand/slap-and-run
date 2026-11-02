@@ -69,6 +69,8 @@ const UPGRADES = [
   { id: 'recover',   tab: 'SKILLS', name: 'Fast Recovery',   desc: '+15% sprint recharge per level',        max: 5, base: 50,  icon: 'energy' },
   { id: 'burst',     tab: 'SKILLS', name: 'Hit & Run',       desc: 'Speed burst right after every slap',    max: 5, base: 80,  icon: 'skates' },
   { id: 'skin',      tab: 'SKILLS', name: 'Thick Skin',      desc: '+1 max heart per level',                max: 3, base: 160, icon: 'heart' },
+  { id: 'bikebuster', tab: 'SKILLS', name: 'Bike Buster',    max: 3, base: 120, icon: 'bike',
+    desc: L => ['Slap riders off their scooters', 'Now slap e-bike riders off too', 'Empty rides roll on and bowl over chasers', 'Scooters, e-bikes and runaway rides!'][L] },
   { id: 'gloves',    tab: 'GEAR',   name: 'Slap Gloves',     desc: 'Longer reach and faster slaps',         max: 5, base: 70,  icon: 'mega' },
   { id: 'sneakers',  tab: 'GEAR',   name: 'Sneakers',        desc: '+3% running speed per level',           max: 4, base: 90,  icon: 'skates' },
   { id: 'backpack',  tab: 'GEAR',   name: 'Bigger Backpack', desc: '+1 item slot per level',                max: 2, base: 220, icon: 'box' },
@@ -175,10 +177,11 @@ const MISSIONS = [
   { k: 'hide',     make() { const n = pick([2, 4]); return { text: 'Hide in a phone booth ' + n + ' times', ev: 'hide', goal: n, reward: 30 + n * 10 }; } },
   { k: 'copcrash', make() { const n = pick([2, 4]); return { text: 'Wreck ' + n + ' police cars', ev: 'copcrash', goal: n, reward: 50 + n * 15 }; } },
   { k: 'bike',     make() { const n = pick([2, 4, 6]); return { text: 'Get ' + n + ' chasers wiped out by e-bikes', ev: 'bike', goal: n, reward: 35 + n * 10 }; } },
+  { k: 'unseat',   need: () => lvl('bikebuster') > 0, make() { const n = pick([2, 3, 5]); return { text: 'Knock ' + n + ' riders off their rides', ev: 'unseat', goal: n, reward: 35 + n * 12 }; } },
   { k: 'visit',    run: true, make() { const d = pick(['downtown', 'park', 'residential']); return { text: 'Reach ' + DISTRICTS[d].name + ' in one run', ev: 'district', district: d, goal: 1, reward: 50 }; } },
 ];
 function newMission(exclude) {
-  const pool = MISSIONS.filter(m => !exclude.includes(m.k));
+  const pool = MISSIONS.filter(m => !exclude.includes(m.k) && (!m.need || m.need()));
   const t = pick(pool.length ? pool : MISSIONS);
   const m = t.make();
   m.k = t.k; m.run = !!t.run; m.max = !!t.max; m.prog = 0;

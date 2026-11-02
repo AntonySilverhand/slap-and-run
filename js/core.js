@@ -55,55 +55,117 @@ let camX = -550, VW = 1100, camCX = 0; // camCX = smoothed centre the camera fol
 
 // ---------- graphics quality (auto-adapts to the device; G cycles it manually) ----------
 const QUALITY = {
-  high:   { label: 'HIGH',   dpr: 2,    pad: 1300, decor: true,  skyline: true,  maxParts: 400, crowd: 1.0,  rigRange: 420, faces: true,  tex: 1 },
-  medium: { label: 'MEDIUM', dpr: 1.5,  pad: 1000, decor: true,  skyline: true,  maxParts: 260, crowd: 0.85, rigRange: 260, faces: true,  tex: 1 },
-  low:    { label: 'LOW',    dpr: 1,    pad: 750,  decor: false, skyline: false, maxParts: 150, crowd: 0.7,  rigRange: 140, faces: false, tex: 0.6 },
-  potato: { label: 'POTATO', dpr: 0.7,  pad: 500,  decor: false, skyline: false, maxParts: 80,  crowd: 0.55, rigRange: 40,  faces: false, tex: 0.45 },
+  high:    { label: 'HIGH',    dpr: 2,    pad: 1300, decor: true,  skyline: true,  maxParts: 400, crowd: 1.0,  rigRange: 420, faces: true,  tex: 1,    hudDpr: 2 },
+  medium:  { label: 'MEDIUM',  dpr: 1.5,  pad: 1000, decor: true,  skyline: true,  maxParts: 260, crowd: 0.85, rigRange: 260, faces: true,  tex: 1,    hudDpr: 2 },
+  low:     { label: 'LOW',     dpr: 1,    pad: 750,  decor: false, skyline: false, maxParts: 150, crowd: 0.7,  rigRange: 140, faces: false, tex: 0.6,  hudDpr: 1.25 },
+  potato:  { label: 'POTATO',  dpr: 0.7,  pad: 500,  decor: false, skyline: false, maxParts: 80,  crowd: 0.55, rigRange: 40,  faces: false, tex: 0.45, hudDpr: 1.25 },
+  minimal: { label: 'MINIMAL', dpr: 0.5,  pad: 380,  decor: false, skyline: false, maxParts: 40,  crowd: 0.45, rigRange: 0,   faces: false, tex: 0.35, hudDpr: 1 },
 };
-const QLEVELS = ['potato', 'low', 'medium', 'high'];
+const QLEVELS = ['minimal', 'potato', 'low', 'medium', 'high'];
 const IS_TOUCH_DEVICE = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+// the GPU's name tells us a lot about what the device can handle
+const GPU_NAME = (() => {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (!gl) return '';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || '');
+    const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); // free it straight away
+    return name;
+  } catch (e) { return ''; }
+})();
 function deviceDefaultQuality() {
   const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4;
-  if (IS_TOUCH_DEVICE) return (mem <= 3 || cores <= 4) ? 'low' : 'medium';
-  return (mem <= 2 || cores <= 2) ? 'medium' : 'high';
+  const g = GPU_NAME.toLowerCase();
+  const saveData = !!(navigator.connection && navigator.connection.saveData);
+  // software rendering (no real GPU): keep it as light as possible
+  if (/swiftshader|llvmpipe|softpipe|software|basic render/.test(g)) return 'minimal';
+  // old / entry-level mobile and integrated GPUs
+  const weakGpu = /mali-(2|3|4|t6|t7|g31|g51|g52)\b|adreno \(tm\) ?[1-4]\d\d|adreno \(tm\) ?50\d|powervr (sgx|rogue g[e6])|intel.*(hd graphics ?(2|3|4|5)\d{2,3}|gma)|vivante|videocore/.test(g);
+  const pixels = screen.width * screen.height * Math.pow(window.devicePixelRatio || 1, 2);
+  let lv;
+  if (IS_TOUCH_DEVICE) lv = (mem <= 2 || cores <= 2) ? 'potato' : (mem <= 3 || cores <= 4) ? 'low' : 'medium';
+  else lv = (mem <= 2 || cores <= 2) ? 'low' : (mem <= 4 && cores <= 4) ? 'medium' : 'high';
+  let i = QLEVELS.indexOf(lv);
+  if (weakGpu) i -= 1;
+  if (saveData) i -= 1;
+  if (pixels > 5e6 && i > QLEVELS.indexOf('low')) i -= 1; // 4K / very dense screens cost a lot of fill-rate
+  return QLEVELS[clamp(i, 0, QLEVELS.length - 1)];
+}
+// the level auto mode settled on last time on this device (so low-end phones start where they belong)
+let rememberedAuto = null;
+try { rememberedAuto = localStorage.getItem('slaprun_autoq'); } catch (e) { }
+if (!QUALITY[rememberedAuto]) rememberedAuto = null;
+function autoStartQuality() {
+  const d = deviceDefaultQuality();
+  return rememberedAuto && QLEVELS.indexOf(rememberedAuto) < QLEVELS.indexOf(d) ? rememberedAuto : d;
 }
 let qualityMode = 'auto';
 try { qualityMode = localStorage.getItem('slaprun_quality') || 'auto'; } catch (e) { }
-let qualityLevel = qualityMode === 'auto' ? deviceDefaultQuality() : qualityMode;
+if (qualityMode !== 'auto' && !QUALITY[qualityMode]) qualityMode = 'auto';
+let qualityLevel = qualityMode === 'auto' ? autoStartQuality() : qualityMode;
 let Q = QUALITY[qualityLevel];
 const qualityListeners = [];
+// changes are queued and applied at the start of the next frame, right before it is drawn —
+// resizing a canvas clears it, so applying mid-frame used to flash a black screen
+let pendingQuality = null;
 function setQualityLevel(lv) {
-  if (!QUALITY[lv] || lv === qualityLevel) return;
+  if (!QUALITY[lv]) return;
+  pendingQuality = lv === qualityLevel ? null : lv;
+}
+function applyPendingQuality() {
+  if (!pendingQuality) return false;
+  const lv = pendingQuality; pendingQuality = null;
+  if (lv === qualityLevel) return false;
   qualityLevel = lv; Q = QUALITY[lv];
   for (const f of qualityListeners) f();
+  return true;
+}
+function rememberAutoQuality() {
+  if (qualityMode !== 'auto') return;
+  try { localStorage.setItem('slaprun_autoq', pendingQuality || qualityLevel); } catch (e) { }
 }
 function cycleQualityMode() {
-  const modes = ['auto', 'high', 'medium', 'low', 'potato'];
+  const modes = ['auto', 'high', 'medium', 'low', 'potato', 'minimal'];
   qualityMode = modes[(modes.indexOf(qualityMode) + 1) % modes.length];
   try { localStorage.setItem('slaprun_quality', qualityMode); } catch (e) { }
-  setQualityLevel(qualityMode === 'auto' ? deviceDefaultQuality() : qualityMode);
-  autoQ.lockedUp = false;
+  setQualityLevel(qualityMode === 'auto' ? autoStartQuality() : qualityMode);
+  autoQ.lockedUp = false; autoQ.acc = autoQ.n = autoQ.win = 0;
 }
 // auto mode: watch real frame times and step quality down (or carefully back up)
 const autoQ = { acc: 0, n: 0, win: 0, good: 0, lastChange: 0, lockedUp: false, lastDown: -99 };
 function trackFrameTime(ms, now) {
-  if (qualityMode !== 'auto' || ms > 120) return; // ignore tab switches / hitches
+  if (qualityMode !== 'auto' || ms > 120 || document.hidden) return; // ignore tab switches / hitches
   autoQ.acc += ms; autoQ.n++; autoQ.win += ms;
-  if (autoQ.win < 2000) return;
-  const avg = autoQ.acc / autoQ.n;
+  const avgNow = autoQ.acc / autoQ.n;
+  // badly struggling (under ~30 fps)? react after one second instead of two, and jump two steps
+  const severe = autoQ.win >= 1000 && avgNow > 33;
+  if (autoQ.win < 2000 && !severe) return;
+  const avg = avgNow;
   autoQ.acc = autoQ.n = autoQ.win = 0;
-  const i = QLEVELS.indexOf(qualityLevel);
-  if (avg > 21 && i > 0 && now - autoQ.lastChange > 2500) {
+  const i = QLEVELS.indexOf(pendingQuality || qualityLevel);
+  if (avg > 21 && i > 0 && now - autoQ.lastChange > (severe ? 1200 : 2500)) {
     if (now - autoQ.lastUp < 8000) autoQ.lockedUp = true; // stepping up didn't hold — stay down
-    setQualityLevel(QLEVELS[i - 1]); autoQ.lastChange = now; autoQ.good = 0;
+    setQualityLevel(QLEVELS[Math.max(0, i - (severe ? 2 : 1))]); autoQ.lastChange = now; autoQ.good = 0;
+    rememberAutoQuality();
   } else if (avg < 18.5) {
     autoQ.good++;
     if (autoQ.good >= 8 && !autoQ.lockedUp && i < QLEVELS.length - 1 && QLEVELS.indexOf(deviceDefaultQuality()) >= i + 1) {
       setQualityLevel(QLEVELS[i + 1]); autoQ.lastChange = autoQ.lastUp = now; autoQ.good = 0;
-    }
+    } else if (autoQ.good === 15) rememberAutoQuality(); // this level holds up well — start here next time
   } else autoQ.good = 0;
 }
 autoQ.lastUp = -99999;
+// the GPU dropped our graphics (memory pressure, app switch...): come back lighter so it doesn't repeat
+let contextLosses = 0;
+function onGraphicsLost() {
+  contextLosses++;
+  const i = QLEVELS.indexOf(pendingQuality || qualityLevel);
+  if (i > 0) setQualityLevel(QLEVELS[Math.max(0, i - contextLosses)]);
+  autoQ.lockedUp = true; autoQ.acc = autoQ.n = autoQ.win = 0;
+  rememberAutoQuality();
+}
 let showFps = false;
 try { showFps = localStorage.getItem('slaprun_fps') === '1'; } catch (e) { }
 function toggleFps() { showFps = !showFps; try { localStorage.setItem('slaprun_fps', showFps ? '1' : '0'); } catch (e) { } }
@@ -900,7 +962,17 @@ function slapHit(q, dir, chained = false) {
     if (chance(0.25)) say(o, 'gasp');
   }
 }
-function hurtPlayer(src) {
+// how many hearts a hit costs: cars & police cruisers 2, people 1, dogs / e-bikes / scooters half a heart
+const DAMAGE = { car: 2, cruiser: 2, person: 1, dog: 0.5, rider: 0.5 };
+function damageOf(src) {
+  if (src.kind === 'ebike' || src.kind === 'scooter') return DAMAGE.rider;
+  if (src.len || src.h !== undefined && src.v !== undefined) return DAMAGE.car;
+  if (src.type === 'dog') return DAMAGE.dog;
+  return DAMAGE.person;
+}
+const fmtHearts = n => (n >= 1 ? String(Math.floor(n)) : '') + (n % 1 ? '½' : '');
+let heartFx = { lostFrom: 0, lostTo: 0, t: 0, gainT: 0 }; // drives the HUD heart animations
+function hurtPlayer(src, dmg) {
   const p = player;
   if (gs !== 'play' || p.invuln > 0 || p.downT > 0) return false;
   if (untouchable()) {
@@ -915,10 +987,16 @@ function hurtPlayer(src) {
     else if (src.state === 'chase') { knockDown(src, src.x < p.x ? -1 : 1, 320, 1.4); src.angryAfter = true; }
     return false;
   }
-  p.hearts--; p.invuln = 3.0; p.downT = 0.9; p.sprinting = false; p.hidden = false;
+  if (dmg === undefined) dmg = damageOf(src);
+  heartFx.lostFrom = p.hearts; heartFx.t = 1;
+  p.hearts = Math.max(0, Math.round((p.hearts - dmg) * 2) / 2);
+  heartFx.lostTo = p.hearts;
+  p.invuln = 3.0; p.downT = dmg >= 2 ? 1.2 : dmg < 1 ? 0.6 : 0.9; p.sprinting = false; p.hidden = false;
   p.fallDir = src.x < p.x ? 1 : -1; p.kvx = p.fallDir * 280;
   shake = 16; hitStop = 0.09; camPunch = 0.07; sfx.slap(); sfx.hurt(); buzz([60, 40, 60]);
   popup(p.x, p.y, 96, src.type === 'dog' ? 'CHOMP!' : 'OUCH!', '#ff4757', 30, 1.0, true);
+  popup(p.x, p.y, 60, '-' + fmtHearts(dmg) + ' ♥', dmg >= 2 ? '#ff3838' : dmg < 1 ? '#ffb8b8' : '#ff6b81', dmg >= 2 ? 26 : 20, 1.2, true);
+  if (dmg >= 2) { shake = 24; camPunch = 0.1; }
   if (p.hearts <= 0) {
     gs = 'dying'; dyingT = 1.8; p.downT = 999; sfx.over(); camPunch = 0.1;
     endRun();
@@ -1062,7 +1140,7 @@ function applyPower(k) {
 }
 function healPlayer(label) {
   const p = player;
-  if (p.hearts < MAX_HEARTS) { p.hearts++; popup(p.x, p.y, 120, label, '#ff4757', 20, 1.2, true); }
+  if (p.hearts < MAX_HEARTS) { p.hearts = Math.min(MAX_HEARTS, p.hearts + 1); heartFx.gainT = 1; popup(p.x, p.y, 120, label, '#ff4757', 20, 1.2, true); }
   else { const pts = addScore(300); popup(p.x, p.y, 120, 'FULL HEALTH +' + pts, '#ff4757', 16, 1.1, true); }
   for (let i = 0; i < 6; i++) fx('heartp', p.x + rand(-12, 12), p.y, 70, { vx: rand(-20, 20), vz: rand(40, 80), life: rand(0.8, 1.2), size: rand(4, 6), color: '#ff4757' });
   sfx.pickup();
@@ -1799,7 +1877,7 @@ function updateCars(dt) {
     const hx = c.len / 2, hy = c.depth / 2;
     if (!c.passed && (player.x - c.x) * c.dir < -hx) { c.passed = true; const dy = Math.abs(player.y - c.y); if (dy >= hy + 4 && dy < hy + 42 && player.invuln <= 0) closeCall(player.x, player.y); }
     if (!c.wrecked && Math.abs(player.x - c.x) < hx + player.r && Math.abs(player.y - c.y) < hy + 4) {
-      if (hurtPlayer(c)) {
+      if (hurtPlayer(c, DAMAGE.car)) {
         player.fallDir = c.dir; player.kvx = c.dir * 650; sfx.crash();
         popup(player.x, player.y, 130, 'HONK!', '#feca57', 24, 1.0);
       }
@@ -1875,6 +1953,29 @@ function spawnRider() {
     color: pick(['#e74c3c', '#00b894', '#fdcb6e', '#0984e3', '#e056fd']), skin: pick(SKINS),
   });
 }
+// Bike Buster upgrade: Lv1 slaps scooter riders off, Lv2 e-bike riders too, Lv3 the empty ride keeps rolling
+const canUnseat = kind => gs === 'play' && lvl('bikebuster') >= (kind === 'scooter' ? 1 : 2);
+function unseatRider(r) {
+  const p = player;
+  r.crashed = true; r.crashT = 0;
+  r.runaway = lvl('bikebuster') >= 3;
+  r.speed *= r.runaway ? 0.9 : 0.5;
+  p.facing = r.x >= p.x ? 1 : -1; p.slapCd = slapCooldown(); p.slapT = 0.25;
+  // the rider flies off and becomes an (angry) pedestrian
+  const type = r.kind === 'ebike' ? 'delivery' : pick(['hipster', 'normal', 'skater', 'suit']);
+  const q = addPed(r.x + r.dir * 10, clamp(r.y, Y_MIN + 10, Y_MAX - 10), type);
+  q.look.shirt = r.color; q.look.skin = r.skin; q.facing = -r.dir;
+  r.exRider = q;
+  slapHit(q, r.dir);
+  q.kvx = r.dir * (260 + r.speed * 0.8); q.timer += 0.9; // they go flying, and need longer to get up
+  const bonus = addScore(r.kind === 'ebike' ? 400 : 300);
+  addCoins(r.kind === 'ebike' ? 3 : 2);
+  missionEvent('unseat');
+  popup(r.x, r.y, 140, (r.kind === 'ebike' ? 'OFF YOUR BIKE!' : 'SCOOTER STOPPED!') + ' +' + bonus, '#fdcb6e', 18, 1.3, true);
+  sfx.crash(); shake = Math.max(shake, 10); hitStop = Math.max(hitStop, 0.05);
+  for (let i = 0; i < 10; i++) fx('star', r.x, r.y, 50, { vx: rand(-80, 80) + r.dir * 140, vy: rand(-40, 40), vz: rand(80, 220), g: 500, life: rand(0.4, 0.8), size: rand(3, 6), color: pick(['#ffd32a', '#fff200', '#ffffff']) });
+  dust(r.x, r.y, 8);
+}
 function updateRiders(dt) {
   if (gs === 'play') {
     const m = { downtown: 0.6, shops: 0.85, park: 1, residential: 1.3 }[curDistrict] || 1;
@@ -1884,19 +1985,30 @@ function updateRiders(dt) {
   const p = player;
   for (let i = riders.length - 1; i >= 0; i--) {
     const r = riders[i];
+    if (r.crashed) {
+      r.crashT += dt;
+      r.speed *= Math.exp(-(r.runaway ? 0.7 : 3.5) * dt);
+      if (r.speed < 140) r.tipT = (r.tipT || 0) + dt; // slowed down enough to fall over
+      if (r.speed > 60 && Math.random() < dt * 12) fx('dust', r.x - r.dir * 14, r.y, 2, { vx: -r.dir * 30, vz: 20, life: 0.4, size: 5, color: '#b2bec3' });
+    }
     r.x += r.dir * r.speed * dt; r.wheel += r.speed * dt / 9;
     const ahead = (p.x - r.x) * r.dir, dy = Math.abs(p.y - r.y);
-    if (!r.rang && ahead > 0 && ahead < 520 && dy < 60 && gs === 'play') { r.rang = true; sfx.bell(); }
-    if (!r.passed && ahead < -20) { r.passed = true; if (dy >= 16 && dy < 50 && p.invuln <= 0) closeCall(p.x, p.y); }
-    if (Math.abs(p.x - r.x) < 24 && dy < 16 && hurtPlayer(r)) {
-      p.fallDir = r.dir; p.kvx = r.dir * 420; sfx.crash();
-      popup(p.x, p.y, 130, 'BIKE!', '#feca57', 22, 1.0);
+    if (!r.crashed) {
+      if (!r.rang && ahead > 0 && ahead < 520 && dy < 60 && gs === 'play') { r.rang = true; sfx.bell(); }
+      if (!r.passed && ahead < -20) { r.passed = true; if (dy >= 16 && dy < 50 && p.invuln <= 0) closeCall(p.x, p.y); }
+      // with the upgrade you slap them off before they can hit you
+      if (canUnseat(r.kind) && p.downT <= 0 && !p.hidden && ahead > -12 && Math.abs(p.x - r.x) < slapReach() + 16 && dy < slapDepth() + 6) { unseatRider(r); continue; }
+      if (Math.abs(p.x - r.x) < 24 && dy < 16 && hurtPlayer(r, DAMAGE.rider)) {
+        p.fallDir = r.dir; p.kvx = r.dir * 420; sfx.crash();
+        popup(p.x, p.y, 130, r.kind === 'ebike' ? 'BIKE!' : 'SCOOTER!', '#feca57', 22, 1.0);
+      }
     }
+    const rolling = !r.crashed || (r.runaway && r.speed > 120);
     for (const q of peds) {
-      if (q.type === 'dog' || isFlat(q) || isGone(q) || q.state === 'frozen') continue;
+      if (!rolling || q === r.exRider || q.type === 'dog' || isFlat(q) || isGone(q) || q.state === 'frozen') continue;
       const qa = (q.x - r.x) * r.dir, qdy = Math.abs(q.y - r.y);
-      if (q.state === 'walk' && qa > 0 && qa < 170 && qdy < 22 && !(q.dodgeT > 0)) { q.dodgeT = 0.45; q.dodgeDir = q.y >= r.y ? 1 : -1; }
-      if (Math.abs(q.x - r.x) < 22 + q.r && qdy < 14) {
+      if (!r.crashed && q.state === 'walk' && qa > 0 && qa < 170 && qdy < 22 && !(q.dodgeT > 0)) { q.dodgeT = 0.45; q.dodgeDir = q.y >= r.y ? 1 : -1; }
+      if (Math.abs(q.x - r.x) < 22 + q.r && qdy < (r.crashed ? 22 : 14)) {
         const wasChase = q.state === 'chase', keep = q.anger;
         knockDown(q, r.dir, 480, 1.7);
         q.angryAfter = wasChase;
@@ -1904,11 +2016,12 @@ function updateRiders(dt) {
         if (wasChase && gs === 'play') {
           q.angerMax = Math.max(3, keep) + 1;
           missionEvent('bike');
-          const pts = addScore(200); popup(q.x, q.y, 100, 'WIPEOUT! +' + pts, '#fdcb6e', 18, 1.1, true);
+          const pts = addScore(r.crashed ? 300 : 200);
+          popup(q.x, q.y, 100, (r.crashed ? 'RUNAWAY RIDE! +' : 'WIPEOUT! +') + pts, '#fdcb6e', 18, 1.1, true);
         }
       }
     }
-    if ((r.dir > 0 && r.x > camX + VW + 700) || (r.dir < 0 && r.x < camX - 700)) riders.splice(i, 1);
+    if ((r.dir > 0 && r.x > camX + VW + 700) || (r.dir < 0 && r.x < camX - 700) || (r.crashed && r.crashT > 7)) riders.splice(i, 1);
   }
 }
 // ---------- coins, toasts, announcer, background mission ticks ----------
@@ -1991,7 +2104,7 @@ function updateCruisers(dt) {
     c.y = clamp(ny, 22, 442);
     if (c.life <= -6 || Math.abs(c.x - p.x) > 2600) { cruisers.splice(i, 1); continue; }
     // hits you
-    if (c.state === 'chase' && Math.hypot(p.x - c.x, p.y - c.y) < COP_R + p.r && hurtPlayer(c)) {
+    if (c.state === 'chase' && Math.hypot(p.x - c.x, p.y - c.y) < COP_R + p.r && hurtPlayer(c, DAMAGE.cruiser)) {
       c.state = 'stunned'; c.t = 1.2; p.fallDir = Math.cos(c.h) >= 0 ? 1 : -1; p.kvx = p.fallDir * 420;
       popup(p.x, p.y, 130, 'BUSTED BY A COP CAR!', '#4a69bd', 16, 1.1);
     }

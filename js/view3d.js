@@ -4,10 +4,45 @@
 //  Characters face +X in their local space.
 // =====================================================================
 
+// no WebGL at all (very old phone, blocked GPU)? the classic 2D version still runs everywhere
+(() => {
+  let ok = false;
+  try {
+    const c = document.createElement('canvas'), g = window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl'));
+    ok = !!g;
+    const lose = g && g.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); // just a probe: free it
+  } catch (e) { }
+  if (!ok) { location.replace('classic-2d.html'); throw new Error('WebGL unavailable - switching to the 2D version'); }
+})();
+
 const V = (() => {
   const glCanvas = document.getElementById('gl');
-  // phones have dense screens already, so skip MSAA there
-  const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: !IS_TOUCH_DEVICE, powerPreference: 'high-performance' });
+  // phones have dense screens already, so skip MSAA there (and on the lightest settings)
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: !IS_TOUCH_DEVICE && QLEVELS.indexOf(qualityLevel) >= QLEVELS.indexOf('medium'), powerPreference: IS_TOUCH_DEVICE ? 'default' : 'high-performance' });
+  } catch (e) { location.replace('classic-2d.html'); throw e; }
+  // ---------- surviving a lost GPU context (the cause of the sudden black screen) ----------
+  // Phones reclaim graphics memory when they run low or when you switch apps. Without handling
+  // this the 3D view just turns black while the game keeps going underneath.
+  const gl = renderer.getContext();
+  const loseExt = gl.getExtension('WEBGL_lose_context');
+  const state = { lost: false, lostAt: 0 };
+  let restoreTimer = 0;
+  glCanvas.addEventListener('webglcontextlost', e => {
+    e.preventDefault(); // tells the browser we want the context back
+    state.lost = true; state.lostAt = performance.now();
+    if (gs === 'play') gs = 'paused';
+    onGraphicsLost();
+    clearTimeout(restoreTimer);
+    // some browsers only restore when asked
+    restoreTimer = setTimeout(() => { if (state.lost && loseExt) try { loseExt.restoreContext(); } catch (err) { } }, 1500);
+  }, false);
+  glCanvas.addEventListener('webglcontextrestored', () => {
+    state.lost = false; clearTimeout(restoreTimer);
+    rebuildAll = true; // re-create every mesh on the fresh context
+  }, false);
+  let rebuildAll = false;
   const applyDpr = () => renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
   applyDpr();
   const scene = new THREE.Scene();
@@ -459,9 +494,18 @@ const V = (() => {
     for (const o of cvw.own) o.dispose();
     for (const m of cvw.nm) { const i = nightMats.indexOf(m); if (i >= 0) nightMats.splice(i, 1); }
   }
+  let chunkGen = 0; // bumped when graphics quality changes; older chunk views get rebuilt gradually
   function syncChunks() {
     const a = Math.floor((camX - Q.pad) / CHUNK), b = Math.floor((camX + VW + Q.pad) / CHUNK);
-    for (let i = a; i <= b; i++) if (!chunkViews.has(i)) chunkViews.set(i, buildChunk(getChunk(i)));
+    for (let i = a; i <= b; i++) if (!chunkViews.has(i)) { const v = buildChunk(getChunk(i)); v.gen = chunkGen; chunkViews.set(i, v); }
+    // rebuild at most one out-of-date chunk per frame (nearest first) instead of the whole street at once
+    let stale = null, sd = 1e9;
+    for (const [i, cvw] of chunkViews) {
+      if (cvw.gen === chunkGen) continue;
+      const d = Math.abs((i + 0.5) * CHUNK - (camX + VW / 2));
+      if (d < sd) { sd = d; stale = i; }
+    }
+    if (stale !== null) { disposeChunk(chunkViews.get(stale)); const v = buildChunk(getChunk(stale)); v.gen = chunkGen; chunkViews.set(stale, v); }
     for (const [i, cvw] of chunkViews) if (i < a - 1 || i > b + 1) { disposeChunk(cvw); chunkViews.delete(i); }
     for (const cvw of chunkViews.values()) {
       for (const fv of cvw.flockViews) {
@@ -942,6 +986,7 @@ const V = (() => {
   function buildRider(r) {
     const g = new THREE.Group();
     const bike = new THREE.Group(); g.add(bike);
+    const man = new THREE.Group(); g.add(man); // the rider, so a knocked-off ride can carry on empty
     const dark = mat('#2d3436'), jacket = mat(r.color), skin = mat(r.skin);
     g.userData.wheels = [];
     if (r.kind === 'ebike') {
@@ -954,26 +999,27 @@ const V = (() => {
       mesh(box(22.4, 4, 20.4), mat('#ffffff'), -20, 40, 0, bike);
       mesh(box(6, 16, 10), mat('#2d3436'), -2, 16, 0, bike); // battery
       // seated rider
-      for (const z of [-5, 5]) { const l = mesh(box(16, 5, 5), mat('#2d3436'), 2, 26, z, g); l.rotation.z = -0.3; mesh(box(5, 14, 5), mat('#2d3436'), 9, 18, z, g); }
-      mesh(box(14, 26, 14), jacket, 0, 41, 0, g).rotation.z = -0.35;
-      for (const z of [-8, 8]) mesh(box(20, 4, 4), jacket, 11, 46, z, g).rotation.z = -0.4;
-      mesh(sph(9, 12, 10), skin, 8, 60, 0, g);
-      mesh(dome(10.5, 0.55), mat('#2d3436'), 7, 61, 0, g);
+      for (const z of [-5, 5]) { const l = mesh(box(16, 5, 5), mat('#2d3436'), 2, 26, z, man); l.rotation.z = -0.3; mesh(box(5, 14, 5), mat('#2d3436'), 9, 18, z, man); }
+      mesh(box(14, 26, 14), jacket, 0, 41, 0, man).rotation.z = -0.35;
+      for (const z of [-8, 8]) mesh(box(20, 4, 4), jacket, 11, 46, z, man).rotation.z = -0.4;
+      mesh(sph(9, 12, 10), skin, 8, 60, 0, man);
+      mesh(dome(10.5, 0.55), mat('#2d3436'), 7, 61, 0, man);
     } else {
       for (const x of [-14, 14]) { const w = mesh(cyl(5, 5, 4, 12), dark, x, 5, 0, bike); w.rotation.x = Math.PI / 2; g.userData.wheels.push(w); }
       mesh(box(34, 3, 11), mat('#636e72'), 0, 9, 0, bike);
       mesh(box(3, 46, 3), mat('#636e72'), 16, 32, 0, bike).rotation.z = -0.15;
       mesh(box(3, 3, 20), dark, 19, 55, 0, bike);
       // standing rider
-      for (const z of [-4, 4]) mesh(box(5, 30, 5), mat('#34495e'), z * 0.5, 25, z, g);
-      mesh(box(13, 26, 14), jacket, 2, 52, 0, g).rotation.z = -0.15;
-      for (const z of [-8, 8]) mesh(box(18, 4, 4), jacket, 10, 58, z, g).rotation.z = -0.2;
-      mesh(sph(9, 12, 10), skin, 6, 73, 0, g);
-      mesh(dome(10.5, 0.55), mat(r.color), 5, 74, 0, g);
+      for (const z of [-4, 4]) mesh(box(5, 30, 5), mat('#34495e'), z * 0.5, 25, z, man);
+      mesh(box(13, 26, 14), jacket, 2, 52, 0, man).rotation.z = -0.15;
+      for (const z of [-8, 8]) mesh(box(18, 4, 4), jacket, 10, 58, z, man).rotation.z = -0.2;
+      mesh(sph(9, 12, 10), skin, 6, 73, 0, man);
+      mesh(dome(10.5, 0.55), mat(r.color), 5, 74, 0, man);
     }
     for (const w of g.userData.wheels) w.userData.dyn = true;
     mergePerGroup(g, (g.userData.own = []));
     g.userData.shadow = blob(16, g, 2.2);
+    g.userData.man = man; g.userData.bike = bike;
     g.rotation.y = r.dir > 0 ? 0 : Math.PI;
     return g;
   }
@@ -1134,6 +1180,12 @@ const V = (() => {
     return night;
   }
   function frame(dt) {
+    if (state.lost) return 0;
+    if (rebuildAll) {
+      rebuildAll = false;
+      for (const [i, cvw] of chunkViews) { disposeChunk(cvw); chunkViews.delete(i); }
+      frameId++; sweep(); // drops every character / vehicle so they are re-created
+    }
     frameId++;
     // camera follows the player
     cx = camCX;
@@ -1198,6 +1250,12 @@ const V = (() => {
       if (Math.abs(r.x - cx) > VW * 0.5 + 700) continue;
       const g = track(r, buildRider);
       g.position.set(r.x, 0, r.y);
+      if (r.crashed) { // rider knocked off: the empty ride wobbles on, then tips over and skids
+        g.userData.man.visible = false;
+        const tip = Math.min(1, (r.tipT || 0) * 4);
+        g.userData.bike.rotation.x = tip * 1.45 + (1 - tip) * Math.sin(gameTime * 24) * 0.12;
+        g.userData.bike.position.y = tip * 4;
+      }
       for (const w of g.userData.wheels) { if (r.kind === 'ebike') w.rotation.z = -r.wheel; else w.rotation.y = r.wheel; }
     }
     for (const it of items) {
@@ -1238,7 +1296,7 @@ const V = (() => {
   }
   qualityListeners.push(() => {
     applyDpr();
-    for (const [i, cvw] of chunkViews) { disposeChunk(cvw); chunkViews.delete(i); }
+    chunkGen++;
   });
   // compile every shader variant up front so nothing hitches the first time it appears
   function warmup() {
@@ -1256,5 +1314,5 @@ const V = (() => {
     leash = null;
   }
   function stats() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }; }
-  return { frame, resize, project, stats, warmup, get camDist() { return camDist; } };
+  return { frame, resize, project, stats, warmup, get camDist() { return camDist; }, get lost() { return state.lost; }, get lostAt() { return state.lostAt; } };
 })();

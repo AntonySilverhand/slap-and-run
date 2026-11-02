@@ -6,9 +6,15 @@
 
 const ctx = cv.getContext('2d');
 let DPR = 1, CW = 0, CH = 0, UI = 1;
+let lastSize = '';
 function resizeAll() {
-  DPR = Math.min(window.devicePixelRatio || 1, Q.dpr >= 1.5 ? 2 : 1.25);
+  DPR = Math.min(window.devicePixelRatio || 1, Q.hudDpr);
   CW = window.innerWidth; CH = window.innerHeight;
+  if (!CW || !CH) return; // hidden / mid-rotation: keep the last good size rather than a 0x0 canvas
+  // resizing a canvas wipes it, so only do it when something really changed
+  const key = CW + 'x' + CH + '@' + DPR + '/' + Q.dpr;
+  if (key === lastSize) return;
+  lastSize = key;
   cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
   // scale UI from the shorter side so phones, foldables and tablets stay readable
   UI = clamp(Math.min(CW / 900, CH / 640, Math.min(CW, CH) / 560), 0.7, 1.5);
@@ -55,14 +61,51 @@ function drawStar(x, y, r, color) {
   ctx.closePath();
   ctx.fill();
 }
-function heart(x, y, r, color) {
-  ctx.fillStyle = color;
+function heartPath(x, y, r) {
   ctx.beginPath();
   ctx.moveTo(x, y + r * 0.9);
   ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.7, y - r * 1.3, x, y - r * 0.45);
   ctx.bezierCurveTo(x + r * 0.7, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9);
+}
+function heart(x, y, r, color) {
+  ctx.fillStyle = color;
+  heartPath(x, y, r);
   ctx.fill();
   ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.stroke();
+}
+// fill: 1 = full, 0.5 = half (right half red, joining the full hearts), 0 = empty
+function heartFill(x, y, r, fill, color = '#ff4757', empty = 'rgba(255,255,255,0.25)') {
+  if (fill >= 1) { heart(x, y, r, color); return; }
+  ctx.fillStyle = empty; heartPath(x, y, r); ctx.fill();
+  if (fill > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x + r * 1.7 - r * 3.4 * fill, y - r * 1.5, r * 3.4 * fill, r * 3); ctx.clip(); // the side next to the full hearts
+    ctx.fillStyle = color; heartPath(x, y, r); ctx.fill();
+    ctx.restore();
+  }
+  heartPath(x, y, r); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.stroke();
+}
+// the health bar: half hearts, a flash + shake on the hearts you just lost, a pop when healed,
+// and a heartbeat when you're nearly out
+function drawHearts(R0, y, hs, u) {
+  const hp = player.hearts, n = MAX_HEARTS;
+  const fxT = heartFx.t, low = hp <= 1.5 && gs === 'play';
+  for (let i = 0; i < n; i++) {
+    let x = R0 - 12 * u - i * hs * 2.5, yy = y, r = hs;
+    const fill = clamp(hp - i, 0, 1);
+    const lost = fxT > 0 && i < heartFx.lostFrom && i + 1 > heartFx.lostTo;
+    if (lost) { x += Math.sin(gameTime * 70 + i) * 3 * u * fxT; yy -= 4 * u * fxT; }
+    if (low && fill > 0) r *= 1 + Math.max(0, Math.sin(gameTime * 9)) * 0.22;
+    if (heartFx.gainT > 0 && i < hp && i + 1 >= hp) r *= 1 + heartFx.gainT * 0.5;
+    heartFill(x, yy, r, fill);
+    if (lost) { // the part that just broke off flashes white
+      ctx.globalAlpha = fxT; heartFill(x, yy, r * (1 + (1 - fxT) * 0.6), 1, '#ffffff', 'rgba(0,0,0,0)'); ctx.globalAlpha = 1;
+      heartFill(x, yy, r, fill);
+    }
+  }
+  const now = performance.now(), dt = Math.min(0.1, (now - (heartFx.last || now)) / 1000);
+  heartFx.last = now;
+  heartFx.t = Math.max(0, heartFx.t - dt * 1.4);
+  heartFx.gainT = Math.max(0, heartFx.gainT - dt * 2.5);
 }
 function drawVein(x, y, r) {
   ctx.strokeStyle = '#ff1e1e'; ctx.lineWidth = Math.max(1.5, r * 0.7); ctx.lineCap = 'round';
@@ -84,6 +127,16 @@ function drawIcon(k, x, y, r) {
   ctx.save();
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   switch (k) {
+    case 'bike':
+      ctx.strokeStyle = '#fdcb6e'; ctx.lineWidth = Math.max(1.5, r * 0.14);
+      ctx.beginPath(); ctx.arc(x - r * 0.55, y + r * 0.35, r * 0.38, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x + r * 0.55, y + r * 0.35, r * 0.38, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath(); ctx.moveTo(x - r * 0.55, y + r * 0.35); ctx.lineTo(x - r * 0.1, y - r * 0.25); ctx.lineTo(x + r * 0.35, y - r * 0.25); ctx.lineTo(x + r * 0.55, y + r * 0.35);
+      ctx.moveTo(x + r * 0.35, y - r * 0.25); ctx.lineTo(x + r * 0.3, y - r * 0.6); ctx.lineTo(x + r * 0.55, y - r * 0.6); ctx.stroke();
+      ctx.strokeStyle = '#ff4757'; ctx.lineWidth = Math.max(1.5, r * 0.16);
+      ctx.beginPath(); ctx.moveTo(x - r * 0.9, y - r * 0.9); ctx.lineTo(x - r * 0.45, y - r * 0.5); ctx.moveTo(x - r * 0.45, y - r * 0.9); ctx.lineTo(x - r * 0.9, y - r * 0.5); ctx.stroke();
+      break;
     case 'ufo':
       ctx.fillStyle = '#a4f4ff'; ctx.beginPath(); ctx.ellipse(x, y - r * 0.12, r * 0.42, r * 0.42, 0, Math.PI, TAU); ctx.fill();
       ctx.fillStyle = '#b2bec3'; ellipse(x, y + r * 0.1, r, r * 0.3);
@@ -510,9 +563,20 @@ function coinLabel(x, y, size, align = 'left', text) {
   drawCoin(cx0, y - size * 0.36, size * 0.45);
   txt(s, align === 'left' ? x + size * 1.15 : align === 'right' ? x : x + size * 0.35, y, size, '#ffd32a', align === 'center' ? 'center' : align);
 }
+function drawGraphicsLost() {
+  const u = UI, cx = CW / 2;
+  ctx.fillStyle = '#15171e'; ctx.fillRect(0, 0, CW, CH);
+  let y = CH * 0.36;
+  fitTxt('GRAPHICS PAUSED', cx, y, 34 * u, '#ffdd59', CW * 0.9); y += 34 * u;
+  const waited = (performance.now() - V.lostAt) / 1000;
+  fitTxt(waited < 5 ? 'Your device needed its graphics memory back — restoring (with lighter graphics)...' : 'The graphics did not come back on their own.', cx, y, 14 * u, '#ffffff', CW * 0.9); y += 22 * u;
+  fitTxt('Your run is paused and your progress is saved.', cx, y, 12 * u, '#c8d6e5', CW * 0.9); y += 40 * u;
+  if (waited >= 5) button('RELOAD GRAPHICS', cx, y, Math.min(CW * 0.8, 300 * u), 46 * u, () => { persist(); location.reload(); }, '#ff6b6b');
+}
 function drawHUD() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   uiButtons = [];
+  if (V.lost) { drawGraphicsLost(); return; }
   const u = UI, cx = CW / 2, narrow = isNarrow(), compact = narrow || isShort(), L0 = SA.l + 16 * u, R0 = CW - SA.r - 16 * u, T0 = SA.t;
   if (gs === 'title') { drawTitle(); drawPanel(); return; }
   if (gs === 'over') { drawOver(); drawPanel(); drawFps(); return; } // results only, no in-run HUD behind them
@@ -541,7 +605,7 @@ function drawHUD() {
   }
   // right: hearts, sprint, district
   const hs = (narrow ? 11 : 13) * u * (MAX_HEARTS > 8 ? 0.85 : 1);
-  for (let i = 0; i < MAX_HEARTS; i++) heart(R0 - 12 * u - i * hs * 2.5, T0 + 30 * u, hs, i < player.hearts ? '#ff4757' : 'rgba(255,255,255,0.25)');
+  drawHearts(R0, T0 + 30 * u, hs, u);
   const bw = (narrow ? 110 : 150) * u, bh = 12 * u, bx = R0 - bw, by = T0 + 52 * u;
   const infinite = power.energy > 0;
   ctx.fillStyle = 'rgba(0,0,0,0.5)'; rr(bx - 3, by - 3, bw + 6, bh + 6, 4); ctx.fill();
@@ -681,6 +745,7 @@ function drawPause() {
   button('RESUME', cx, y, bw, 46 * u, () => { gs = 'play'; }, '#ff6b6b'); y += 56 * u;
   button('SETTINGS', cx, y, bw, 40 * u, () => openMenu('settings'), '#7bed9f'); y += 50 * u;
   button('QUIT TO TITLE', cx, y, bw, 40 * u, () => { persist(); reset(); gs = 'title'; }, '#dfe6e9'); y += 40 * u;
+  fitTxt('Getting hit costs:  car / cop car 2 ♥  ·  person 1 ♥  ·  dog, e-bike or scooter ½ ♥', cx, y + 18 * u, 12 * u, '#ff9aa5', CW * 0.92); y += 26 * u;
   drawMissions(cx - Math.min(CW * 0.9, 460 * u) / 2, y + 10 * u, Math.min(CW * 0.9, 460 * u), 16 * u);
 }
 function drawTitle() {
@@ -791,7 +856,7 @@ function drawShop(A, u) {
       drawIcon(up.icon, A.x + 30 * u, y + rowH / 2 - 4 * u, 16 * u);
       txt(up.name, A.x + 58 * u, y + 24 * u, 16 * u, '#ffffff', 'left');
       for (let i = 0; i < up.max; i++) { ctx.fillStyle = i < L ? '#ffd32a' : 'rgba(255,255,255,0.2)'; rr(A.x + 58 * u + i * 16 * u, y + 32 * u, 12 * u, 6 * u, 3); ctx.fill(); }
-      fitTxt(up.desc, A.x + 58 * u, y + 52 * u, 11 * u, '#c8d6e5', A.w - 200 * u, 'left');
+      fitTxt(typeof up.desc === 'function' ? up.desc(L) : up.desc, A.x + 58 * u, y + 52 * u, 11 * u, '#c8d6e5', A.w - 200 * u, 'left');
       areaButton(A, maxed ? 'MAX' : 'BUY ' + cost, A.x + A.w - 72 * u, y + rowH / 2 - 4 * u, 120 * u, 36 * u, () => { if (!maxed) buyUpgrade(up); }, maxed ? '#8395a7' : afford ? '#7bed9f' : '#ff6b6b');
       y += rowH;
     }
@@ -1028,13 +1093,22 @@ reset();
 try { V.warmup(); } catch (e) { console.warn('warmup skipped', e); }
 let last = performance.now();
 function loop(now) {
+  requestAnimationFrame(loop); // schedule first: one bad frame must never stop the game for good
   const raw = now - last;
   const dt = clamp(raw / 1000, 0, 0.05); // rAF timestamps can trail performance.now()
   last = now;
-  update(dt);
-  render(dt);
   trackFrameTime(raw, now);
+  applyPendingQuality(); // canvases get resized here, right before this frame redraws them
+  if (V.lost && gs === 'play') gs = 'paused'; // never play blind while the 3D view is gone
+  try {
+    update(dt);
+    render(dt);
+  } catch (e) {
+    console.error(e);
+    if (++loopErrors <= 3) toast('Oops — something glitched, recovering...', '#ff6b6b');
+    if (gs === 'play' && loopErrors > 20) gs = 'paused';
+  }
   if (raw > 0 && raw < 250) { fpsAcc += raw; fpsN++; if (fpsAcc > 500) { fpsShown = Math.round(1000 * fpsN / fpsAcc); fpsAcc = fpsN = 0; } }
-  requestAnimationFrame(loop);
 }
+let loopErrors = 0;
 requestAnimationFrame(loop);
