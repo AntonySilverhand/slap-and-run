@@ -162,6 +162,56 @@ function drawIcon(k, x, y, r) {
       for (let i = 0; i < 4; i++) { const w = r * (0.9 - i * 0.2); line(x - w + i * r * 0.08, y - r * 0.7 + i * r * 0.45, x + w + i * r * 0.08, y - r * 0.7 + i * r * 0.45); }
       break;
     case 'heart': heart(x, y, r * 0.7, '#ff4757'); break;
+    case 'nitro':
+      ctx.fillStyle = '#2d3436'; rr(x - r * 0.3, y - r * 0.8, r * 0.6, r * 1.2, r * 0.2); ctx.fill();
+      ctx.fillStyle = '#e74c3c'; poly([x - r * 0.3, y - r * 0.8, x + r * 0.3, y - r * 0.8, x, y - r * 1.1]);
+      ctx.fillStyle = '#ff9f1a'; poly([x - r * 0.3, y + r * 0.4, x + r * 0.3, y + r * 0.4, x, y + r * 1.0]);
+      ctx.fillStyle = '#ffd32a'; poly([x - r * 0.15, y + r * 0.4, x + r * 0.15, y + r * 0.4, x, y + r * 0.75]);
+      break;
+    case 'hawk':
+      ctx.fillStyle = '#8d5a2b'; ellipse(x, y, r * 0.5, r * 0.28);
+      poly([x - r * 0.1, y - r * 0.05, x - r * 0.95, y - r * 0.6, x - r * 0.55, y + r * 0.05]); poly([x + r * 0.1, y - r * 0.05, x + r * 0.95, y - r * 0.6, x + r * 0.55, y + r * 0.05]);
+      ctx.fillStyle = '#f5f5f5'; circle(x + r * 0.45, y - r * 0.12, r * 0.2);
+      ctx.fillStyle = '#f1c40f'; poly([x + r * 0.62, y - r * 0.16, x + r * 0.85, y - r * 0.06, x + r * 0.62, y]);
+      break;
+    case 'giant':
+      ctx.fillStyle = '#e056fd'; circle(x, y - r * 0.55, r * 0.3); rr(x - r * 0.35, y - r * 0.25, r * 0.7, r * 0.9, r * 0.2); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = r * 0.12; line(x + r * 0.7, y + r * 0.6, x + r * 0.7, y - r * 0.7); line(x + r * 0.45, y - r * 0.45, x + r * 0.7, y - r * 0.75); line(x + r * 0.95, y - r * 0.45, x + r * 0.7, y - r * 0.75);
+      break;
+    case 'aura': for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + 0.4; drawIcon('aura1', x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.4); } break;
+    case 'aura1':
+      ctx.fillStyle = '#ffcc99'; ctx.strokeStyle = '#7f5539'; ctx.lineWidth = Math.max(1, r * 0.1);
+      circle(x, y + r * 0.15, r * 0.55); ctx.stroke();
+      for (let i = 0; i < 4; i++) { rr(x - r * 0.5 + i * r * 0.27, y - r * 0.8, r * 0.22, r * 0.6, r * 0.1); ctx.fill(); }
+      break;
+    case 'rapid':
+      drawIcon('aura1', x + r * 0.2, y, r * 0.9);
+      ctx.strokeStyle = '#ffdd59'; ctx.lineWidth = r * 0.12; for (let i = 0; i < 3; i++) line(x - r * 0.95, y - r * 0.4 + i * r * 0.4, x - r * 0.45, y - r * 0.4 + i * r * 0.4);
+      break;
+    case 'golden':
+      ctx.fillStyle = '#f1c40f'; ctx.strokeStyle = '#b7950b'; ctx.lineWidth = Math.max(1, r * 0.1);
+      circle(x, y + r * 0.15, r * 0.55); ctx.stroke();
+      for (let i = 0; i < 4; i++) { rr(x - r * 0.5 + i * r * 0.27, y - r * 0.8, r * 0.22, r * 0.6, r * 0.1); ctx.fill(); }
+      drawStar(x + r * 0.7, y - r * 0.7, r * 0.3, '#ffffff');
+      break;
+    case 'rush':
+      ctx.fillStyle = '#5d3a1a'; ellipse(x - r * 0.1, y + r * 0.1, r * 0.6, r * 0.38); circle(x + r * 0.5, y - r * 0.05, r * 0.3);
+      ctx.fillStyle = '#f5f0e1'; poly([x + r * 0.35, y - r * 0.25, x + r * 0.2, y - r * 0.85, x + r * 0.5, y - r * 0.3]); poly([x + r * 0.65, y - r * 0.25, x + r * 0.9, y - r * 0.8, x + r * 0.75, y - r * 0.2]);
+      ctx.fillStyle = '#3e2412'; for (const lx of [-0.45, -0.15, 0.1, 0.3]) ctx.fillRect(x + lx * r, y + r * 0.35, r * 0.12, r * 0.45);
+      break;
+    case 'boomerang':
+      ctx.strokeStyle = '#fdcb6e'; ctx.lineWidth = r * 0.14; ctx.setLineDash([r * 0.2, r * 0.15]);
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.85, r * 0.45, 0, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke(); ctx.setLineDash([]);
+      drawIcon('aura1', x + r * 0.55, y - r * 0.1, r * 0.55);
+      break;
+    case 'crowd':
+      ctx.strokeStyle = '#0984e3'; ctx.lineWidth = r * 0.35; ctx.beginPath(); ctx.arc(x, y - r * 0.05, r * 0.55, Math.PI, TAU); ctx.stroke();
+      ctx.fillStyle = '#dfe6e9'; ctx.fillRect(x - r * 0.72, y - r * 0.05, r * 0.35, r * 0.4); ctx.fillRect(x + r * 0.37, y - r * 0.05, r * 0.35, r * 0.4);
+      ctx.fillStyle = '#ffffff'; circle(x, y + r * 0.7, r * 0.15);
+      break;
+    case 'chain':
+      ctx.fillStyle = '#74b9ff'; poly([x + r * 0.15, y - r * 0.9, x - r * 0.5, y + r * 0.1, x - r * 0.05, y + r * 0.1, x - r * 0.25, y + r * 0.9, x + r * 0.5, y - r * 0.15, x + r * 0.05, y - r * 0.15]);
+      break;
     case 'box':
       ctx.fillStyle = '#e1a32a'; rr(x - r * 0.75, y - r * 0.7, r * 1.5, r * 1.4, r * 0.2); ctx.fill();
       ctx.fillStyle = '#c0392b'; ctx.fillRect(x - r * 0.12, y - r * 0.7, r * 0.24, r * 1.4);
@@ -267,11 +317,24 @@ function drawWorldOverlay() {
         ctx.restore(); break;
       case 'feather': ctx.fillStyle = '#95a5a6'; ellipse(s.x, s.y, 4 * k, 2 * k, gameTime * 4 + p.x); ctx.fillStyle = '#636e72'; ellipse(s.x + 3 * k, s.y - 2 * k, 2 * k, 1.5 * k); break;
       case 'heartp': heart(s.x, s.y, p.size * k, p.color); break;
+      case 'zap': {
+        const e = V.project(p.x2, p.z2, p.y2);
+        ctx.strokeStyle = p.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(s.x, s.y);
+        for (let i = 1; i < 6; i++) ctx.lineTo(lerp(s.x, e.x, i / 6) + rand(-8, 8), lerp(s.y, e.y, i / 6) + rand(-8, 8));
+        ctx.lineTo(e.x, e.y); ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
+        break;
+      }
       case 'smoke': ctx.fillStyle = p.color; circle(s.x, s.y, p.size * k); break;
       default: ctx.fillStyle = p.color; circle(s.x, s.y, p.size * k);
     }
   }
   ctx.globalAlpha = 1;
+  // slap aura: hands orbiting the player
+  if (power.aura > 0 && gs === 'play') {
+    const c = V.project(player.x, 45, player.y), k = PX * c.k;
+    for (let i = 0; i < 4; i++) { const a = gameTime * 7 + i * TAU / 4; drawIcon('aura1', c.x + Math.cos(a) * 62 * k, c.y + Math.sin(a) * 24 * k, 11 * k); }
+  }
   // box opening roulette
   if (opening) {
     const keysP = Object.keys(POWERS);
@@ -318,6 +381,15 @@ function drawWorldOverlay() {
     if (left) poly([x - 10, y, x + 6, y - 11, x + 6, y + 11]); else poly([x + 10, y, x - 6, y - 11, x - 6, y + 11]);
     ctx.stroke();
     txt(Math.round(Math.abs(q.x - player.x) / 10) + 'm', left ? x + 24 : x - 24, y + 5, 12, '#ffffff');
+  }
+  for (const c of cruisers) {
+    if (c.state === 'wrecked') continue;
+    const s = edge(c.x, c.y, 30);
+    if (s.x > 0 && s.x < CW && s.ok) continue;
+    const left = s.x <= 0, x = left ? 22 : CW - 22, y = clamp(s.y, 90, CH - 30);
+    ctx.fillStyle = ((gameTime * 8) | 0) % 2 ? '#ff3838' : '#3867d6'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 14, 0, TAU); ctx.fill(); ctx.stroke();
+    txt('COP', x, y + 4, 9, '#ffffff');
   }
   for (const it of items) {
     if (it.kind === 'pizza' || it.kind === 'coin') continue;
@@ -412,18 +484,18 @@ const qualityText = () => 'GRAPHICS: ' + (qualityMode === 'auto' ? 'AUTO (' + Q.
 let menu = null, shopTab = 'SKILLS', panelScroll = 0, panelMax = 0, dispScore = 0, panelNote = null;
 const note = (text, color = '#7bed9f') => { panelNote = { text, color, t: gameTime + 3 }; };
 function openMenu(m) { menu = m; panelScroll = 0; sfx.ding(); }
-function touchButtons() {
+function touchButtons() { // slapping is automatic, so the only action button is SPRINT
   const u = clamp(Math.min(CW, CH) / 420, 0.75, 1.35);
-  return { slap: { x: CW - SA.r - 82 * u, y: CH - SA.b - 95 * u, r: 50 * u }, sprint: { x: CW - SA.r - 196 * u, y: CH - SA.b - 64 * u, r: 44 * u }, u };
+  return { sprint: { x: CW - SA.r - 82 * u, y: CH - SA.b - 92 * u, r: 52 * u }, u };
 }
 function slotRects() {
   const out = [];
   if (touchMode && isShort()) { // landscape phone: a row left of SPRINT so the street stays clear
     const B = touchButtons(), s = 42 * B.u, gap = 8 * B.u;
     for (let i = 0; i < MAX_ITEMS; i++) out.push({ x: B.sprint.x - B.sprint.r - 14 * B.u - (i + 1) * s - i * gap, y: B.sprint.y - s / 2, s });
-  } else if (touchMode) { // a column above the SLAP button, within reach of the right thumb
+  } else if (touchMode) { // a column above the SPRINT button, within reach of the right thumb
     const B = touchButtons(), s = (MAX_ITEMS > 3 ? 40 : 46) * B.u, gap = 8 * B.u;
-    for (let i = 0; i < MAX_ITEMS; i++) out.push({ x: B.slap.x - s / 2, y: B.slap.y - B.slap.r - 14 * B.u - (i + 1) * s - i * gap, s });
+    for (let i = 0; i < MAX_ITEMS; i++) out.push({ x: B.sprint.x - s / 2, y: B.sprint.y - B.sprint.r - 14 * B.u - (i + 1) * s - i * gap, s });
   } else {
     const u = UI, s = 50 * u, gap = 10 * u, total = MAX_ITEMS * s + (MAX_ITEMS - 1) * gap;
     for (let i = 0; i < MAX_ITEMS; i++) out.push({ x: CW / 2 - total / 2 + i * (s + gap), y: CH - SA.b - s - 30 * u, s });
@@ -570,13 +642,10 @@ function drawTouch() {
   const B = touchButtons(), u = B.u;
   ctx.globalAlpha = 0.85;
   ctx.lineWidth = 3; ctx.strokeStyle = '#fff';
-  ctx.fillStyle = 'rgba(231,76,60,0.85)'; circle(B.slap.x, B.slap.y, B.slap.r);
-  ctx.beginPath(); ctx.arc(B.slap.x, B.slap.y, B.slap.r, 0, TAU); ctx.stroke();
-  txt('SLAP', B.slap.x, B.slap.y + 7 * u, 18 * u, '#ffffff');
   ctx.fillStyle = sprintTouch !== null ? 'rgba(123,237,159,0.95)' : player.winded ? 'rgba(127,140,141,0.7)' : 'rgba(76,209,55,0.85)';
   circle(B.sprint.x, B.sprint.y, B.sprint.r);
   ctx.beginPath(); ctx.arc(B.sprint.x, B.sprint.y, B.sprint.r, 0, TAU); ctx.stroke();
-  txt('SPRINT', B.sprint.x, B.sprint.y + 5 * u, 13 * u, '#ffffff');
+  txt('SPRINT', B.sprint.x, B.sprint.y + 6 * u, 16 * u, '#ffffff');
   if (joy.active) {
     ctx.fillStyle = 'rgba(255,255,255,0.15)'; circle(joy.ox, joy.oy, 60 * u);
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; circle(joy.ox + joy.vx * 60 * u, joy.oy + joy.vy * 60 * u, 24 * u);
@@ -883,7 +952,6 @@ cv.addEventListener('touchstart', e => {
     if (menu) { panelDrag = { id: t.identifier, x, y, s0: panelScroll, moved: false }; continue; }
     if (hitButton(x, y)) continue;
     if (gs !== 'play') { if (gs === 'title' || (gs === 'over' && overT > 0.9)) startFromTap(); continue; }
-    if (Math.hypot(x - B.slap.x, y - B.slap.y) < B.slap.r * 1.2) { trySlap(); continue; }
     if (Math.hypot(x - B.sprint.x, y - B.sprint.y) < B.sprint.r * 1.25) { sprintTouch = t.identifier; continue; }
     const SR = slotRects();
     let hit = false;

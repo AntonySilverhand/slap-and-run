@@ -409,22 +409,35 @@ function sidewalkYNear(y) { return y < CENTER_LINE ? rand(30, 104) : rand(350, 4
 
 // ---------- power-ups & events ----------
 const POWERS = {
-  ufo:      { name: 'UFO STRIKE', desc: 'Aliens abduct your chasers!', w: 9, color: '#7bed9f' },
-  banana:   { name: 'BANANA TRAIL', desc: 'Drop peels — chasers slip!', w: 10, color: '#ffd32a', dur: 8 },
+  // --- slap more & go faster (the common ones) ---
+  nitro:    { name: 'NITRO', desc: 'Rocket burst — double speed!', w: 10, color: '#ff9f1a', dur: 2.5 },
+  hawk:     { name: 'HAWK FORM', desc: 'Become a hawk — swoop down and slap!', w: 8, color: '#c8a165', dur: 7 },
+  giant:    { name: 'GIANT MODE', desc: 'Huge reach, faster, chasers bounce off', w: 8, color: '#e056fd', dur: 8 },
+  aura:     { name: 'SLAP AURA', desc: 'Spinning hands slap everyone near you', w: 9, color: '#ff6b81', dur: 7 },
+  rapid:    { name: 'RAPID HANDS', desc: '3x faster slaps, longer reach', w: 9, color: '#ffdd59', dur: 8 },
+  golden:   { name: 'GOLDEN HAND', desc: 'Double points, triple coins per slap', w: 8, color: '#f1c40f', dur: 10 },
+  rush:     { name: 'RAGING BULL', desc: 'Become a bull and trample everyone', w: 9, color: '#e17055', dur: 2.2 },
+  boomerang:{ name: 'BOOMERANG HAND', desc: 'A giant hand slaps its way out and back', w: 9, color: '#fdcb6e' },
+  crowd:    { name: 'PEOPLE MAGNET', desc: 'Pulls nearby people right to your hand', w: 8, color: '#0984e3', dur: 6 },
+  chain:    { name: 'CHAIN SLAP', desc: 'Every slap zaps 3 more people', w: 9, color: '#74b9ff', dur: 10 },
   mega:     { name: 'MEGA SLAP', desc: 'Giant slaps flatten everyone!', w: 9, color: '#ff6b81', dur: 7 },
-  skates:   { name: 'ROCKET SKATES', desc: 'Super speed!', w: 9, color: '#70a1ff', dur: 9 },
-  disguise: { name: 'DISGUISE', desc: 'Chasers lose track of you', w: 8, color: '#a4b0be', dur: 7 },
-  decoy:    { name: 'DECOY DUMMY', desc: 'Chasers attack a fake you', w: 8, color: '#ffa502' },
-  energy:   { name: 'ENERGY DRINK', desc: 'Unlimited sprint!', w: 9, color: '#2ed573', dur: 8 },
-  shield:   { name: 'BUBBLE SHIELD', desc: 'Blocks the next catch', w: 8, color: '#48dbfb', dur: 25 },
-  horn:     { name: 'AIR HORN', desc: 'Knocks everyone nearby flat', w: 8, color: '#ff9f43' },
-  smoke:    { name: 'SMOKE BOMB', desc: 'Vanish in a puff of smoke', w: 8, color: '#b2bec3' },
-  cash:     { name: 'CASH RAIN', desc: 'Chasers stop to grab the money', w: 8, color: '#2ecc71' },
-  pie:      { name: 'CREAM PIES', desc: 'Pie to the face for your chasers', w: 9, color: '#fff3e0' },
-  flowers:  { name: 'SORRY FLOWERS', desc: 'Chasers forgive you', w: 7, color: '#fd79a8' },
-  freeze:   { name: 'FREEZE RAY', desc: 'Ice-cold chasers', w: 8, color: '#81ecec' },
-  tornado:  { name: 'TORNADO', desc: 'Blow the crowd away', w: 7, color: '#a29bfe' },
-  heart:    { name: 'PIZZA HEART', desc: '+1 heart', w: 14, color: '#ff4757', instant: true },
+  skates:   { name: 'ROCKET SKATES', desc: 'Super speed!', w: 8, color: '#70a1ff', dur: 9 },
+  energy:   { name: 'ENERGY DRINK', desc: 'Unlimited sprint!', w: 8, color: '#2ed573', dur: 8 },
+  // --- defence ---
+  shield:   { name: 'BUBBLE SHIELD', desc: 'Blocks the next catch', w: 6, color: '#48dbfb', dur: 25 },
+  heart:    { name: 'PIZZA HEART', desc: '+1 heart', w: 12, color: '#ff4757', instant: true },
+  // --- stopping people (rare now) ---
+  ufo:      { name: 'UFO STRIKE', desc: 'A UFO beams up the crowd around you!', w: 8, color: '#7bed9f' },
+  banana:   { name: 'BANANA TRAIL', desc: 'Drop peels — chasers slip!', w: 3, color: '#ffd32a', dur: 8 },
+  tornado:  { name: 'TORNADO', desc: 'Blow the crowd away', w: 4, color: '#a29bfe' },
+  horn:     { name: 'AIR HORN', desc: 'Knocks everyone nearby flat', w: 3, color: '#ff9f43' },
+  pie:      { name: 'CREAM PIES', desc: 'Pie to the face for your chasers', w: 3, color: '#fff3e0' },
+  freeze:   { name: 'FREEZE RAY', desc: 'Ice-cold chasers', w: 3, color: '#81ecec' },
+  disguise: { name: 'DISGUISE', desc: 'Chasers lose track of you', w: 2, color: '#a4b0be', dur: 7 },
+  decoy:    { name: 'DECOY DUMMY', desc: 'Chasers attack a fake you', w: 2, color: '#ffa502' },
+  smoke:    { name: 'SMOKE BOMB', desc: 'Vanish in a puff of smoke', w: 2, color: '#b2bec3' },
+  cash:     { name: 'CASH RAIN', desc: 'Chasers stop to grab the money', w: 2, color: '#2ecc71' },
+  flowers:  { name: 'SORRY FLOWERS', desc: 'Chasers forgive you', w: 2, color: '#fd79a8' },
 };
 const EVENTS = {
   marathon:  { name: 'MARATHON!', desc: 'A wave of joggers is coming through!', color: '#00e676', w: 3 },
@@ -434,6 +447,8 @@ const EVENTS = {
   flashmob:  { name: 'FLASH MOB!', desc: 'Everybody dance... and get slapped', color: '#e056fd', w: 2 },
   patrol:    { name: 'POLICE PATROL!', desc: 'Cops chase anyone they see slapping', color: '#4a69bd', w: 2 },
   icecream:  { name: 'ICE CREAM TRUCK!', desc: 'Chasers drop everything for a cone', color: '#fd79a8', w: 2.5 },
+  policechase: { name: 'POLICE CHASE!', desc: 'Lead the cruisers into traffic to wreck them', color: '#4a69bd', w: 3 },
+  streetrace:  { name: 'STREET RACE!', desc: 'Racers flying by — lure chasers into the road', color: '#ff4757', w: 2, dur: 14 },
 };
 
 // ---------- procedural street chunks ----------
@@ -517,12 +532,18 @@ let power = {};
 const activeObs = [], activeBooths = [], activeHoles = [], activeFlocks = [];
 let lastBubbleCount = 0;
 let shake = 0, hitStop = 0, elapsed = 0, gameTime = 0, camPunch = 0, announce = null;
-let riders = [], riderTimer = 12, coinTimer = 5, missionTick = 0;
+let riders = [], cruisers = [], riderTimer = 12, coinTimer = 5, missionTick = 0;
 let score = 0, slaps = 0, combo = 0, bestCombo = 0, lastSlapT = -99, carHits = 0, boxesOpened = 0, escapes = 0;
 let overT = 0, dyingT = 0, newBest = false, boxTimer = 0, eventTimer = 0, heartTimer = 0, nextEscapeHeart = 6, curDistrict = 'shops';
 let best = 0;
 try { best = +localStorage.getItem('slaprun_best') || 0; } catch (e) { }
-function resetPowers() { power = { banana: 0, mega: 0, skates: 0, disguise: 0, energy: 0, shield: 0 }; }
+function resetPowers() { power = { nitro: 0, hawk: 0, giant: 0, aura: 0, rapid: 0, golden: 0, rush: 0, crowd: 0, chain: 0, mega: 0, skates: 0, energy: 0, shield: 0, banana: 0, disguise: 0 }; boomerangs = []; }
+let boomerangs = [];
+// live slap stats (power-ups change reach, speed of slapping and who auto-slap may hit)
+const slapReach = () => (SLAP_REACH + (power.rapid > 0 ? 25 : 0)) * player.size;
+const slapDepth = () => SLAP_DEPTH * player.size * (power.rapid > 0 ? 1.3 : 1);
+const slapCooldown = () => SLAP_CD * (power.rapid > 0 ? 0.3 : 1);
+const untouchable = () => power.hawk > 0 || power.rush > 0 || power.giant > 0;
 resetPowers();
 
 function spawnPed(x, y, type) {
@@ -578,7 +599,7 @@ function refreshObs() {
 function reset() {
   applyUpgrades();
   player = newPlayer();
-  riders = []; riderTimer = 12; coinTimer = 5; announce = null; camPunch = 0;
+  riders = []; cruisers = []; riderTimer = 12; coinTimer = 5; announce = null; camPunch = 0;
   peds = []; cars = []; parts = []; pops = []; items = []; bananas = []; inventory = []; pies = []; tornados = [];
   truck = null; ufo = null; decoy = null; opening = null; activeEvent = null; banner = null;
   resetPowers();
@@ -634,7 +655,7 @@ function confetti(x, y, z, n) {
 }
 const isGone = q => q.state === 'abducted' || q.state === 'fell';
 const isFlat = q => q.state === 'down' || q.state === 'getup';
-const chasersNear = (range) => peds.filter(q => q.state === 'chase' && Math.abs(q.x - player.x) < range && Math.abs(q.y - player.y) < range);
+const chasersNear = (range) => peds.filter(q => (q.state === 'chase' || q.state === 'latched') && Math.abs(q.x - player.x) < range && Math.abs(q.y - player.y) < range);
 
 // ---------- collision / steering ----------
 function collide(e) {
@@ -746,9 +767,9 @@ function findTarget(dir, auto = false) {
   let bestQ = null, bd = 1e9;
   for (const q of peds) {
     if (q.type === 'dog' || UNSLAPPABLE.has(q.state)) continue; // no dog slapping, ever
-    if (auto && q.state === 'chase') continue; // auto-slap never hits chasers; re-slapping them is a manual gamble
+    if (auto && q.state === 'chase' && !(power.rapid > 0 || power.giant > 0)) continue; // normally a manual gamble
     const dx = (q.x - player.x) * dir, dy = Math.abs(q.y - player.y);
-    if (dx > -6 && dx < SLAP_REACH + q.r && dy < SLAP_DEPTH) {
+    if (dx > -6 && dx < slapReach() + q.r && dy < slapDepth()) {
       const d = dx + dy;
       if (d < bd) { bd = d; bestQ = q; }
     }
@@ -762,7 +783,7 @@ function trySlap(auto = false) {
   let tgt = findTarget(p.facing, auto);
   if (!tgt) { const back = findTarget(-p.facing, auto); if (back) { p.facing = -p.facing; tgt = back; } }
   if (!tgt && auto) return;
-  p.slapCd = SLAP_CD; p.slapT = 0.25;
+  p.slapCd = slapCooldown(); p.slapT = 0.25;
   if (!tgt) { sfx.whiff(); return; }
   if (tgt.type === 'karate' && tgt.state === 'walk' && chance(0.35)) {
     tgt.blockT = 0.45; p.slapCd = 0.8; sfx.block();
@@ -802,7 +823,7 @@ function startChase(q, angerSec) {
   q.anger = q.angerMax;
   q.photoT = q.mimeT = q.danceT = q.shock = 0;
 }
-function slapHit(q, dir) {
+function slapHit(q, dir, chained = false) {
   const p = player;
   const wasChase = q.state === 'chase', wasTired = q.state === 'tired';
   q.slaps++; q.marked = true; q.angryAfter = true;
@@ -815,14 +836,14 @@ function slapHit(q, dir) {
   combo = (elapsed - lastSlapT < COMBO_WINDOW) ? Math.min(8, combo + 1) : 1;
   lastSlapT = elapsed;
   bestCombo = Math.max(bestCombo, combo);
-  addCoins(1 + (combo >= 3 ? 1 : 0)); bookSlap(q.type);
+  addCoins((1 + (combo >= 3 ? 1 : 0)) * (power.golden > 0 ? 3 : 1)); bookSlap(q.type);
   missionEvent('slap', 1, { type: q.type }); missionEvent('combo', combo);
   const ann = { 3: 'TRIPLE SLAP!', 5: 'SLAP-TASTIC!', 8: 'UNSTOPPABLE!' }[combo];
   if (ann && (!announce || announce.text !== ann)) { announce = { text: ann, t: 1.1, max: 1.1 }; sfx.announce(); }
   p.burstT = lvl('burst') ? 0.6 : 0; camPunch = Math.max(camPunch, 0.035);
   let nc = 0;
   for (const o of peds) if (o !== q && o.state === 'chase') nc++;
-  let mult = combo * (1 + 0.5 * nc);
+  let mult = combo * (1 + 0.5 * nc) * (power.golden > 0 ? 2 : 1);
   if (wasChase) mult *= 1.5;
   if (wasTired) mult *= 1.3;
   if (q.type === 'influencer') mult *= 2;
@@ -837,6 +858,16 @@ function slapHit(q, dir) {
   else if (wasTired) popup(q.x, q.y, hz + 46, 'CHEEKY!', '#ff9f43', 18, 1.2);
   say(q, 'hit', true);
   if (combo > 1) sfx.combo(combo);
+  if (power.chain > 0 && !chained) {
+    const zaps = peds.filter(o => o !== q && o.type !== 'dog' && !UNSLAPPABLE.has(o.state) && Math.hypot(o.x - q.x, o.y - q.y) < 170)
+      .sort((a, b) => Math.hypot(a.x - q.x, a.y - q.y) - Math.hypot(b.x - q.x, b.y - q.y)).slice(0, 3);
+    let from = q;
+    for (const o of zaps) {
+      fx('zap', from.x, from.y, 60, { x2: o.x, y2: o.y, z2: 60, life: 0.3, color: '#74b9ff' });
+      from = o;
+      slapHit(o, o.x >= q.x ? 1 : -1, true);
+    }
+  }
   if ((combo === 5 || combo === 8) && p.hearts < MAX_HEARTS) dropHeart(q.x - dir * 30, q.y, 'heart', 'COMBO HEART!');
   const gain = 10 + 8 * (combo - 1);
   p.stamina = Math.min(STAMINA_MAX, p.stamina + gain);
@@ -855,7 +886,7 @@ function slapHit(q, dir) {
     for (let i = 0; i < 10; i++) fx('drop', q.x, q.y, 50, { vx: rand(-80, 80) + dir * 60, vy: rand(-20, 20), vz: rand(50, 180), g: 500, life: 0.6, size: 2.5, color: '#6f4e37' });
   }
   if (L.mailbag) for (let i = 0; i < 8; i++) fx('letter', q.x, q.y, 50, { vx: rand(-90, 90), vy: rand(-30, 30), vz: rand(80, 220), g: 160, life: rand(1, 1.6), size: 6, color: '#ffffff' });
-  if (q.dog && q.dog.state === 'walk' && gs === 'play') { startChase(q.dog, 4.5); say(q.dog, 'chase', true); sfx.bark(); }
+  if (q.dog && q.dog.state === 'walk' && gs === 'play') { q.dog.state = 'alert'; q.dog.timer = 0.6; q.dog.say = { text: 'GRRR...', t: 1 }; sfx.bark(); }
 
   for (const o of peds) {
     if (o === q || o.type === 'dog' || o.state !== 'walk') continue;
@@ -872,6 +903,10 @@ function slapHit(q, dir) {
 function hurtPlayer(src) {
   const p = player;
   if (gs !== 'play' || p.invuln > 0 || p.downT > 0) return false;
+  if (untouchable()) {
+    if (src.state === 'chase' && src.type !== 'dog' && power.hawk <= 0) { knockDown(src, src.x < p.x ? -1 : 1, 380, 1.3); src.angryAfter = true; popup(src.x, src.y, 96, power.giant > 0 ? 'BOING!' : 'OUT OF MY WAY!', '#e056fd', 15, 0.8); }
+    return false;
+  }
   if (power.shield > 0) {
     power.shield = 0; p.invuln = 1.2; sfx.block(); sfx.pop();
     popup(p.x, p.y, 100, 'SHIELD!', '#48dbfb', 26, 1.0, true);
@@ -1018,6 +1053,10 @@ function applyPower(k) {
       sfx.wind();
       tornados.push({ x: p.x + p.facing * 30, y: p.y, dir: p.facing, life: 3.6, t: 0, hit: new Set() });
       break;
+    case 'boomerang': boomerangs.push({ x: p.x, y: p.y, ox: p.x, dir: p.facing, t: 0, hit: new Set() }); sfx.whiff(); break;
+    case 'nitro': power.nitro = P.dur; camPunch = 0.08; sfx.sprint(); sfx.power(); break;
+    case 'rush': power.rush = P.dur; p.rushDir = p.facing; camPunch = 0.06; transformPuff(); sfx.bull(); break;
+    case 'hawk': power.hawk = P.dur; p.flying = true; transformPuff(); sfx.hawk(); break;
     default: power[k] = P.dur;
   }
 }
@@ -1034,13 +1073,22 @@ function dropHeart(x, y, kind, label) {
 }
 function summonUfo() {
   const d = q => Math.abs(q.x - player.x);
-  let targets = peds.filter(q => q.state === 'chase' || q.state === 'frozen' || (isFlat(q) && q.angryAfter)).sort((a, b) => d(a) - d(b)).slice(0, 8);
-  if (targets.length < 4) {
-    const extra = peds.filter(q => q.state === 'walk' && q.type !== 'dog' && !targets.includes(q) && d(q) < VW * 0.6).sort((a, b) => d(a) - d(b));
-    targets = targets.concat(extra.slice(0, 4 - targets.length));
-  }
+  let targets = peds.filter(q => (q.state === 'chase' || q.state === 'latched' || q.state === 'frozen' || (isFlat(q) && q.angryAfter)) && d(q) < VW).sort((a, b) => d(a) - d(b)).slice(0, 10);
+  const extra = peds.filter(q => (q.state === 'walk' || q.state === 'tired') && !targets.includes(q) && d(q) < VW * 0.6).sort((a, b) => d(a) - d(b));
+  targets = targets.concat(extra.slice(0, Math.max(0, 10 - targets.length)));
   ufo = { x: camX - 120, y: player.y, alt: 250, state: 'seek', targets, target: null };
   sfx.ufo();
+}
+function transformPuff() { const p = player; for (let i = 0; i < 18; i++) fx('smoke', p.x + rand(-25, 25), p.y + rand(-15, 15), rand(10, 70), { vx: rand(-60, 60), vz: rand(10, 50), life: rand(0.5, 0.9), size: rand(10, 18), color: '#ecf0f1' }); confetti(p.x, p.y, 50, 10); }
+function hawkLanding() { // diving back down: a shockwave slaps everyone around you
+  const p = player;
+  transformPuff();
+  fx('ring', p.x, p.y, 0, { r: 20, grow: 420, life: 0.4, color: '#a4b0be' });
+  shake = Math.max(shake, 12); camPunch = 0.07; sfx.crash();
+  for (const q of peds) {
+    if (q.type === 'dog' || UNSLAPPABLE.has(q.state)) continue;
+    if (Math.hypot(q.x - p.x, q.y - p.y) < 120) slapHit(q, q.x >= p.x ? 1 : -1, true);
+  }
 }
 function airHorn() {
   const p = player;
@@ -1088,6 +1136,46 @@ function updatePowers(dt) {
   if (gs !== 'play') return;
   for (const k in power) if (power[k] > 0) power[k] = Math.max(0, power[k] - dt);
   const p = player;
+  if (power.aura > 0) {
+    p.auraT = (p.auraT || 0) - dt;
+    if (p.auraT <= 0) {
+      p.auraT = 0.22;
+      let tgt = null, bd = 100;
+      for (const q of peds) { if (q.type === 'dog' || UNSLAPPABLE.has(q.state)) continue; const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; tgt = q; } }
+      if (tgt) { p.slapT = 0.25; slapHit(tgt, tgt.x >= p.x ? 1 : -1); }
+    }
+  }
+  p.swoopT = Math.max(0, (p.swoopT || 0) - dt);
+  if (power.hawk > 0) {
+    p.hawkT = (p.hawkT || 0) - dt;
+    if (p.hawkT <= 0) {
+      let tgt = null, bd = 150;
+      for (const q of peds) { if (q.type === 'dog' || UNSLAPPABLE.has(q.state)) continue; const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; tgt = q; } }
+      if (tgt) {
+        p.hawkT = 0.45; p.swoopT = 0.35; p.facing = tgt.x >= p.x ? 1 : -1;
+        for (let i = 0; i < 6; i++) fx('feather', tgt.x, tgt.y, 70, { vx: rand(-80, 80), vz: rand(30, 120), g: 80, life: 1, size: 3, color: '#c8a165' });
+        slapHit(tgt, p.facing);
+        sfx.screech();
+      } else p.hawkT = 0.15;
+    }
+  }
+  if (power.rush > 0) for (const q of peds) {
+    if (q.type === 'dog' || UNSLAPPABLE.has(q.state)) continue;
+    if (Math.abs(q.x - p.x) < 40 * p.size && Math.abs(q.y - p.y) < 30 * p.size) slapHit(q, p.rushDir);
+  }
+  for (let i = boomerangs.length - 1; i >= 0; i--) {
+    const b = boomerangs[i];
+    b.t += dt;
+    const k = b.t / 1.6; // out and back in 1.6s
+    if (k >= 1) { boomerangs.splice(i, 1); continue; }
+    const out = Math.sin(k * Math.PI) * 430;   // flies out, then curves back to wherever you are now
+    b.x = b.ox * (1 - k) + p.x * k + b.dir * out;
+    b.y = p.y + Math.sin(k * TAU) * 40;
+    for (const q of peds) {
+      if (q.type === 'dog' || b.hit.has(q) || UNSLAPPABLE.has(q.state)) continue;
+      if (Math.abs(q.x - b.x) < 36 && Math.abs(q.y - b.y) < 30) { b.hit.add(q); slapHit(q, b.dir * (k < 0.5 ? 1 : -1), true); }
+    }
+  }
   if (power.banana > 0) {
     p.bananaT -= dt;
     if (p.bananaT <= 0 && Math.hypot(p.vx, p.vy) > 40) { bananas.push({ x: p.x - p.facing * 16, y: p.y, life: 25, rot: rand(-0.6, 0.6) }); p.bananaT = 0.28; }
@@ -1164,16 +1252,16 @@ function updateUfo(dt) {
       const dx = t.x - ufo.x, step = 1100 * dt;
       ufo.x += clamp(dx, -step, step);
       ufo.y += (t.y - ufo.y) * Math.min(1, dt * 8);
-      if (Math.abs(dx) < 10) { ufo.state = 'beam'; t.state = 'abducted'; t.z = 0; t.lie = 0; t.say = null; sfx.beam(); }
+      if (Math.abs(dx) < 10) { ufo.state = 'beam'; t.wasAngry = t.state === 'chase' || t.state === 'latched' || !!t.angryAfter; t.state = 'abducted'; t.z = 0; t.lie = 0; t.say = null; sfx.beam(); }
     }
   } else if (ufo.state === 'beam') {
     const t = ufo.target;
     t.x += (ufo.x - t.x) * Math.min(1, dt * 6);
     t.z += 330 * dt;
     if (t.z >= ufo.alt - 20) {
-      removePed(t); addEscape(); missionEvent('abduct');
+      removePed(t); if (t.wasAngry) addEscape(); missionEvent('abduct'); addCoins(4);
       const pts = addScore(300);
-      popup(ufo.x, ufo.y, ufo.alt - 40, 'ABDUCTED! +' + pts, '#7bed9f', 20, 1.2, true);
+      popup(ufo.x, ufo.y, ufo.alt - 40, 'CAUGHT BY ALIENS! +' + pts, '#7bed9f', 18, 1.2, true);
       ufo.target = null; ufo.state = 'seek';
     }
   } else {
@@ -1291,6 +1379,7 @@ function startEvent(k) {
       }
       break;
     case 'icecream': spawnTruck(); break;
+    case 'policechase': spawnCruisers(elapsed > 120 ? 3 : 2); break;
   }
   if (E.dur) activeEvent = { key: k, t: E.dur, dur: E.dur };
   showBanner(E.name, E.desc, E.color, 2.6);
@@ -1346,7 +1435,9 @@ function updatePlayer(dt) {
     if (sprint && !p.sprinting) sfx.sprint();
     p.sprinting = sprint;
     p.burstT = Math.max(0, p.burstT - dt);
-    const boost = (power.skates > 0 ? 1.55 : 1) * (p.burstT > 0 ? 1 + 0.07 * lvl('burst') : 1);
+    const dogged = peds.some(q => q.type === 'dog' && q.state === 'latched');
+    const boost = (power.skates > 0 ? 1.55 : 1) * (p.burstT > 0 ? 1 + 0.07 * lvl('burst') : 1) * (dogged ? 0.6 : 1)
+      * (power.nitro > 0 ? 2 : 1) * (power.hawk > 0 ? 1.8 : 1) * (power.giant > 0 ? 1.25 : 1);
     const spd = (sprint ? SPRINT_SPEED : PLAYER_SPEED) * boost;
     vx = ix * spd; vy = iy * spd * 0.82;
     if (sprint && !infinite) p.stamina = Math.max(0, p.stamina - SPRINT_DRAIN * dt);
@@ -1359,11 +1450,19 @@ function updatePlayer(dt) {
       fx(tr === 'trail_sparkle' ? 'star' : 'trail', p.x - p.facing * 10 + rand(-5, 5), p.y + rand(-4, 4), rand(5, 25), { vz: tr === 'trail_flame' ? 60 : 10, life: 0.5, size: tr === 'trail_sparkle' ? 3 : 4.5, color: col });
     }
     if (ix !== 0 && p.slapT <= 0) p.facing = ix > 0 ? 1 : -1;
+    if (power.rush > 0) { vx = p.rushDir * PLAYER_SPEED * 3; vy = iy * PLAYER_SPEED; p.facing = p.rushDir; dust(p.x, p.y, 2); }
+    if (power.nitro > 0 && Math.random() < 0.8) fx('trail', p.x - p.facing * 14, p.y + rand(-5, 5), rand(10, 40), { vz: 30, life: 0.4, size: 5, color: pick(['#ff9f1a', '#ff4757', '#ffd32a']) });
   }
   if (!p.sprinting && p.stamina < STAMINA_NATURAL) p.stamina = Math.min(STAMINA_NATURAL, p.stamina + STAMINA_REGEN * dt);
   if (infinite) p.stamina = STAMINA_MAX;
   p.vx = vx; p.vy = vy;
-  moveEntity(p, vx * dt, vy * dt);
+  // giant mode grows you smoothly; hawk form lifts you into the air (and dips for swoops)
+  p.size += ((power.giant > 0 ? 1.8 : 1) - p.size) * Math.min(1, dt * 6); p.r = 13 * p.size;
+  const flyZ = power.hawk > 0 ? 95 - Math.max(0, p.swoopT || 0) * 140 : 0;
+  p.z += (flyZ - p.z) * Math.min(1, dt * 5);
+  if (power.hawk > 0) { p.x += vx * dt; p.y = clamp(p.y + vy * dt, Y_MIN, Y_MAX); if (Math.random() < 0.15) fx('feather', p.x + rand(-20, 20), p.y, p.z, { vx: rand(-40, 40), vz: rand(-20, 20), g: 40, life: 1, size: 3, color: '#c8a165' }); }
+  else moveEntity(p, vx * dt, vy * dt);
+  if (p.flying && power.hawk <= 0) { p.flying = false; hawkLanding(); }
   const sp = Math.hypot(vx, vy);
   p.moveAmt = p.downT > 0 ? 0 : Math.min(1, sp / 120);
   p.phase += dt * Math.min(sp, 300) / 16;
@@ -1371,6 +1470,10 @@ function updatePlayer(dt) {
 
 // ---------- update: NPCs ----------
 function walkBehaviour(q, dt) {
+  if (power.crowd > 0 && gs === 'play' && q.type !== 'dog') {
+    const dx = player.x - q.x, dy = player.y - q.y, d = Math.hypot(dx, dy);
+    if (d < 340 && d > 20) { q.facing = dx > 0 ? 1 : -1; if (!q.say && Math.random() < dt * 0.5) q.say = { text: pick(['Whoa?!', 'My feet!', 'Huh?!']), t: 0.9 }; return [dx / d * 150, dy / d * 150]; }
+  }
   if (q.dodgeT > 0) { q.dodgeT -= dt; return [0, q.dodgeDir * 170]; }
   if (q.danceT > 0) { q.danceT -= dt; return [0, 0]; }
   if (q.shock > 0) { q.facing = player.x > q.x ? 1 : -1; return [0, 0]; }
@@ -1469,9 +1572,87 @@ function distractedBehaviour(q, dt) {
   if (Math.abs(dx) > 3) q.facing = dx > 0 ? 1 : -1;
   return [sx * sp, sy * sp];
 }
+// ---------- dogs: only defend their owner, never knock you down ----------
+const DOG_SPEED = BASE_SPEED * 1.9; // faster than your walk, slower than your sprint
+let dogTipShown = false;
+function nearbyDecoyFor(d) { // someone else close to the dog that it would rather go after
+  for (const o of peds) {
+    if (o === d || o.type === 'dog' || o === d.owner || (o.state !== 'walk' && o.state !== 'chase')) continue;
+    if (Math.hypot(o.x - d.x, o.y - d.y) < 46) return o;
+  }
+  return null;
+}
+function houndOnto(d, o) {
+  const wasOnYou = d.state === 'chase' || d.state === 'latched';
+  d.state = 'hound'; d.target = o; d.timer = 4;
+  d.say = { text: 'WOOF!', t: 1 }; sfx.bark();
+  if (wasOnYou && gs === 'play') { addEscape(); const got = addScore(100); popup(d.x, d.y, 70, 'DOG DISTRACTED! +' + got, '#fdcb6e', 15, 1.1); }
+}
+function dogChase(d, dt) {
+  if (gs !== 'play') { toWalk(d, false); return [0, 0]; }
+  d.huntT -= dt; d.smokeT = Math.max(0, d.smokeT - dt);
+  d.anger = d.huntT; d.angerMax = 20;
+  if (d.huntT <= 0 || Math.abs(d.x - player.x) > 1500 || ((power.disguise > 0 || player.hidden || d.smokeT > 0) && !decoy)) { toWalk(d, false); return [0, 0]; }
+  const o = nearbyDecoyFor(d);
+  if (o) { houndOnto(d, o); return [0, 0]; }
+  const tx = decoy ? decoy.x : player.x, ty = decoy ? decoy.y : player.y;
+  const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy) || 1;
+  d.ramp = Math.min(1, d.ramp + dt * 1.5);
+  if (Math.abs(dx) > 3) d.facing = dx > 0 ? 1 : -1;
+  if (dist < d.r + 18) {
+    if (decoy) { popup(decoy.x, decoy.y, 84, 'CHOMP!', '#ffdd59', 16, 0.6); decoy.wob = 0.3; toWalk(d, false); return [0, 0]; }
+    if (power.shield > 0 || untouchable()) { popup(player.x, player.y, 100, power.shield > 0 ? 'SHIELD!' : 'NOPE!', '#48dbfb', 16, 0.9); toWalk(d, false); return [0, 0]; }
+    if (player.downT <= 0) {
+      d.state = 'latched'; d.timer = 12;
+      d.say = { text: 'GRRR!', t: 1.2 }; sfx.bark();
+      popup(player.x, player.y, 112, dogTipShown ? 'DOG ON YOUR PANTS!' : 'DOG ON YOUR PANTS! Run past someone to shake it off', '#fdcb6e', dogTipShown ? 16 : 13, dogTipShown ? 1.0 : 2.2);
+      dogTipShown = true;
+      return [0, 0];
+    }
+  }
+  const [sx, sy] = steer(d, dx / dist, dy / dist);
+  const spd = DOG_SPEED * (0.6 + 0.4 * d.ramp);
+  return [sx * spd, sy * spd];
+}
 function updateDog(d, dt) {
   switch (d.state) {
-    case 'chase': return chaseBehaviour(d, dt);
+    case 'alert': // warning growl before the chase starts
+      d.timer -= dt;
+      d.facing = player.x > d.x ? 1 : -1;
+      if (d.timer <= 0) { d.state = 'chase'; d.huntT = 20; d.ramp = 0.3; d.smokeT = 0; }
+      return [0, 0];
+    case 'chase': return dogChase(d, dt);
+    case 'latched': {
+      d.timer -= dt;
+      if (gs !== 'play' || player.downT > 0 || d.timer <= 0 || untouchable()) { toWalk(d, false); return [0, 0]; }
+      if (Math.random() < dt * 1.5) d.say = { text: pick(['GRRR!', 'WOOF!', '*tug*']), t: 0.8 };
+      // pass close to someone else and the dog lets go of you for them
+      for (const o of peds) {
+        if (o === d || o.type === 'dog' || o === d.owner || (o.state !== 'walk' && o.state !== 'chase')) continue;
+        if (Math.hypot(o.x - player.x, o.y - player.y) < 58) { houndOnto(d, o); return [0, 0]; }
+      }
+      const tx = player.x - player.facing * 20, ty = player.y + 5;
+      d.facing = player.facing;
+      return [(tx - d.x) * 14, (ty - d.y) * 14];
+    }
+    case 'hound': { // chasing someone else now
+      d.timer -= dt;
+      const t = d.target;
+      if (!t || !peds.includes(t) || isGone(t) || isFlat(t) || d.timer <= 0) { toWalk(d, false); return [0, 0]; }
+      const dx = t.x - d.x, dy = t.y - d.y, dist = Math.hypot(dx, dy) || 1;
+      if (Math.abs(dx) > 3) d.facing = dx > 0 ? 1 : -1;
+      if (dist < d.r + t.r + 4) {
+        const wasChase = t.state === 'chase';
+        knockDown(t, d.facing, 200, 1.4);
+        t.angryAfter = wasChase;
+        t.say = { text: pick(['AAAH!', 'BAD DOG!', 'NOT MY ANKLES!']), t: 1.2 };
+        sfx.bark();
+        if (wasChase && gs === 'play') { const got = addScore(150); popup(t.x, t.y, 96, 'DOG TACKLE! +' + got, '#fdcb6e', 15, 1.1); }
+        toWalk(d, false);
+        return [0, 0];
+      }
+      return [dx / dist * DOG_SPEED, dy / dist * DOG_SPEED];
+    }
     case 'revenge':
       d.timer -= dt;
       if (Math.random() < dt * 2) say(d, 'chase');
@@ -1585,6 +1766,11 @@ function managePeds() {
 // ---------- traffic ----------
 const CAR_COLORS = ['#e74c3c', '#2980b9', '#ecf0f1', '#2c3e50', '#16a085', '#8e44ad', '#d35400', '#7f8c8d'];
 function spawnCar(L) {
+  if (activeEvent && activeEvent.key === 'streetrace' && chance(0.75)) { // low, loud and very fast
+    cars.push({ x: L.dir > 0 ? camX - 520 : camX + VW + 520, y: L.y, dir: L.dir, speed: rand(950, 1150), len: 140, depth: 56, h: 36, sports: true,
+      color: pick(['#ff4757', '#ffd32a', '#2ed573', '#1e90ff', '#ff6b81', '#ffa502']), honked: false, wheel: 0 });
+    return;
+  }
   const bus = Math.random() < 0.15, taxi = !bus && Math.random() < 0.2;
   const len = bus ? 250 : rand(130, 165);
   cars.push({
@@ -1595,7 +1781,7 @@ function spawnCar(L) {
 }
 function updateCars(dt) {
   if (gs === 'play') {
-    const rush = activeEvent && activeEvent.key === 'rushhour' ? 3 : 1;
+    const ev = activeEvent && activeEvent.key, rush = ev === 'rushhour' ? 3 : ev === 'streetrace' ? 2.2 : 1;
     for (const L of LANES) {
       L.timer -= dt * rush;
       if (L.timer <= 0) { spawnCar(L); L.timer = rand(2.6, 6.5) * Math.max(0.55, 1 - elapsed / 240); }
@@ -1603,6 +1789,7 @@ function updateCars(dt) {
   }
   for (let i = cars.length - 1; i >= 0; i--) {
     const c = cars[i];
+    if (c.wrecked) { c.wreckT -= dt; c.speed *= Math.exp(-4 * dt); if (Math.random() < dt * 5) fx('smoke', c.x, c.y, 50, { vz: 40, life: 1.2, size: 12, color: '#2d3436' }); if (c.wreckT <= 0) { cars.splice(i, 1); continue; } }
     c.x += c.dir * c.speed * dt;
     c.wheel += c.speed * dt / 11;
     if (!c.honked && gs === 'play') {
@@ -1611,14 +1798,14 @@ function updateCars(dt) {
     }
     const hx = c.len / 2, hy = c.depth / 2;
     if (!c.passed && (player.x - c.x) * c.dir < -hx) { c.passed = true; const dy = Math.abs(player.y - c.y); if (dy >= hy + 4 && dy < hy + 42 && player.invuln <= 0) closeCall(player.x, player.y); }
-    if (Math.abs(player.x - c.x) < hx + player.r && Math.abs(player.y - c.y) < hy + 4) {
+    if (!c.wrecked && Math.abs(player.x - c.x) < hx + player.r && Math.abs(player.y - c.y) < hy + 4) {
       if (hurtPlayer(c)) {
         player.fallDir = c.dir; player.kvx = c.dir * 650; sfx.crash();
         popup(player.x, player.y, 130, 'HONK!', '#feca57', 24, 1.0);
       }
     }
     for (const q of peds) {
-      if (q.type === 'dog' || isFlat(q) || isGone(q) || q.state === 'frozen') continue;
+      if (c.wrecked || q.type === 'dog' || isFlat(q) || isGone(q) || q.state === 'frozen') continue;
       if (Math.abs(q.x - c.x) < hx + q.r && Math.abs(q.y - c.y) < hy + 4) {
         const wasChase = q.state === 'chase';
         const keep = q.anger;
@@ -1663,7 +1850,7 @@ function update(dt) {
   updatePlayer(dt);
   if (gs === 'play') trySlap(true); // auto-slap anyone you run into
   updatePeds(dt);
-  if (gs !== 'title') { updateCars(dt); updateRiders(dt); updateItems(dt); updatePowers(dt); updateUfo(dt); updateStreet(dt); updateEvents(dt); updateMeta(dt); }
+  if (gs !== 'title') { updateCars(dt); updateRiders(dt); updateCruisers(dt); updateItems(dt); updatePowers(dt); updateUfo(dt); updateStreet(dt); updateEvents(dt); updateMeta(dt); }
   separate();
   managePeds();
   updateFx(dt);
@@ -1743,5 +1930,97 @@ function updateMeta(dt) {
     missionTick = 1;
     let nc = 0; for (const q of peds) if (q.state === 'chase') nc++;
     missionEvent('heat', nc); missionEvent('time', Math.floor(elapsed));
+  }
+}
+
+// ---------- police cruisers: fast, but they turn wide — wreck them in traffic ----------
+const COP_VMAX = 390, COP_TURN = 2.4, COP_R = 30;
+function spawnCruisers(n) {
+  for (let i = 0; i < n; i++) {
+    const left = i % 2 === 0, L = LANES[left ? 0 : 1];
+    cruisers.push({ x: left ? camX - 300 - i * 120 : camX + VW + 300 + i * 120, y: L.y, h: left ? 0 : Math.PI, v: 260, state: 'chase', t: 0, life: 28, spin: 0, wheel: 0 });
+  }
+  sfx.siren();
+}
+function wreckCruiser(c, label, pts) {
+  if (c.state === 'wrecked') return;
+  c.state = 'wrecked'; c.t = 3; c.spin = rand(-7, 7); c.v *= 0.5;
+  sfx.bigcrash(); shake = Math.max(shake, 14); camPunch = Math.max(camPunch, 0.06);
+  for (let i = 0; i < 14; i++) fx('smoke', c.x + rand(-20, 20), c.y + rand(-10, 10), rand(10, 50), { vx: rand(-60, 60), vz: rand(20, 70), life: rand(0.8, 1.6), size: rand(10, 20), color: '#636e72' });
+  confetti(c.x, c.y, 40, 8);
+  if (gs === 'play') {
+    const got = addScore(pts); addCoins(10); addEscape(); missionEvent('copcrash');
+    popup(c.x, c.y, 110, label + ' +' + got, '#48dbfb', 20, 1.4, true);
+  }
+}
+function updateCruisers(dt) {
+  if (!cruisers.length) return;
+  const p = player;
+  p.sirenT = (p.sirenT || 0) - dt;
+  if (p.sirenT <= 0 && cruisers.some(c => c.state === 'chase')) { p.sirenT = 0.8; sfx.siren(); }
+  for (let i = cruisers.length - 1; i >= 0; i--) {
+    const c = cruisers[i];
+    c.wheel += c.v * dt / 11;
+    if (c.state === 'wrecked') {
+      c.t -= dt; c.v *= Math.exp(-3 * dt); c.h += c.spin * dt; c.spin *= Math.exp(-2 * dt);
+      c.x += Math.cos(c.h) * c.v * dt; c.y = clamp(c.y + Math.sin(c.h) * c.v * dt, 20, 445);
+      if (Math.random() < dt * 6) fx('smoke', c.x, c.y, 40, { vz: 40, life: 1.2, size: 12, color: '#2d3436' });
+      if (c.t <= 0) cruisers.splice(i, 1);
+      continue;
+    }
+    c.life -= dt;
+    if (c.state === 'stunned') { c.t -= dt; c.v *= Math.exp(-4 * dt); if (c.t <= 0) c.state = 'chase'; }
+    else {
+      const leaving = c.life <= 0 || gs !== 'play';
+      if (leaving && !c.left) { c.left = true; popup(c.x, c.y, 90, 'THE COPS GAVE UP', '#74b9ff', 14, 1.2); }
+      const lost = power.disguise > 0 || p.hidden;
+      // aim where you're heading; when leaving, drive off the nearest edge of the screen
+      const tx = leaving ? c.x + (c.x < p.x ? -2000 : 2000) : p.x + p.vx * 0.35, ty = leaving ? (c.y < CENTER_LINE ? 172 : 280) : p.y + p.vy * 0.35;
+      const want = lost ? c.h : Math.atan2(ty - c.y, tx - c.x);
+      let dA = ((want - c.h + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      // overshot you? brake hard and spin round tightly instead of cruising away
+      const behind = Math.abs(dA) > 1.2;
+      const turn = COP_TURN + (1 - c.v / COP_VMAX) * 4;
+      c.h += clamp(dA, -turn * dt, turn * dt);
+      if (behind) c.v = Math.max(110, c.v - 700 * dt);
+      else c.v = Math.min(COP_VMAX, c.v + 320 * dt);
+    }
+    c.x += Math.cos(c.h) * c.v * dt;
+    const ny = c.y + Math.sin(c.h) * c.v * dt;
+    if (ny < 22 || ny > 442) c.v *= 0.97; // scraping along the buildings / kerb
+    c.y = clamp(ny, 22, 442);
+    if (c.life <= -6 || Math.abs(c.x - p.x) > 2600) { cruisers.splice(i, 1); continue; }
+    // hits you
+    if (c.state === 'chase' && Math.hypot(p.x - c.x, p.y - c.y) < COP_R + p.r && hurtPlayer(c)) {
+      c.state = 'stunned'; c.t = 1.2; p.fallDir = Math.cos(c.h) >= 0 ? 1 : -1; p.kvx = p.fallDir * 420;
+      popup(p.x, p.y, 130, 'BUSTED BY A COP CAR!', '#4a69bd', 16, 1.1);
+    }
+    // bowls over pedestrians
+    for (const q of peds) {
+      if (q.type === 'dog' || isFlat(q) || isGone(q)) continue;
+      if (Math.hypot(q.x - c.x, q.y - c.y) < COP_R + q.r) { const wasChase = q.state === 'chase'; knockDown(q, Math.cos(c.h) >= 0 ? 1 : -1, 500, 1.6); q.angryAfter = wasChase; }
+    }
+    // crashes: lamp posts, hydrants, benches...
+    for (const o of activeObs) {
+      if (Math.abs(o.x - c.x) > o.w / 2 + COP_R || Math.abs(o.y - c.y) > o.h / 2 + COP_R) continue;
+      const cx = clamp(c.x, o.x - o.w / 2, o.x + o.w / 2), cy = clamp(c.y, o.y - o.h / 2, o.y + o.h / 2);
+      if (Math.hypot(c.x - cx, c.y - cy) < COP_R) { wreckCruiser(c, { lamp: 'LAMP POST!', hydrant: 'HYDRANT!', bench: 'BENCH CRASH!', trash: 'TRASHED!', truck: 'ICE CREAM CRASH!' }[o.kind] || 'CRASH!', 400); break; }
+    }
+    if (c.state === 'wrecked') continue;
+    // ...traffic...
+    for (const car of cars) {
+      if (car.wrecked) continue;
+      if (Math.abs(car.x - c.x) < car.len / 2 + COP_R && Math.abs(car.y - c.y) < car.depth / 2 + COP_R * 0.6) {
+        car.wrecked = true; car.wreckT = 3;
+        wreckCruiser(c, car.bus ? 'BUS CRASH!' : 'CAR CRASH!', 500);
+        break;
+      }
+    }
+    if (c.state === 'wrecked') continue;
+    // ...and each other
+    for (const o of cruisers) {
+      if (o === c || o.state === 'wrecked') continue;
+      if (Math.hypot(o.x - c.x, o.y - c.y) < COP_R * 2) { wreckCruiser(c, 'PILE-UP!', 800); wreckCruiser(o, 'PILE-UP!', 0); break; }
+    }
   }
 }

@@ -574,7 +574,12 @@ const V = (() => {
     mesh(cyl(1.4, 1, 12, 6), mat('#27ae60'), 0, 5, 0, R.flowers);
     for (const [x, z, c] of [[0, 0, '#e84393'], [2.5, 2, '#fdcb6e'], [-2.5, 1.5, '#ff7675'], [1, -2.5, '#a29bfe']]) mesh(sph(2.6, 8, 6), mat(c), x, 12, z, R.flowers);
     R.camHand = mesh(box(6, 6, 10), mat('#222222'), 3, 0, 0, hF); R.camHand.visible = false;
-    if (L.player) { R.megaHand = mesh(sph(11, 12, 10), handMatA, 2, 0, 0, hF); R.megaHand.visible = false; }
+    if (L.player) {
+      R.megaHand = mesh(sph(11, 12, 10), handMatA, 2, 0, 0, hF); R.megaHand.visible = false;
+      R.goldHand = mesh(sph(6.5, 12, 10), new THREE.MeshToonMaterial({ color: 0xf1c40f, gradientMap: grad, emissive: new THREE.Color('#f39c12'), emissiveIntensity: 0.5 }), 1, 0, 0, hF); R.goldHand.visible = false;
+      R.hawk = buildHawk(); root.add(R.hawk); R.hawk.visible = false;
+      R.bull = buildBull(); root.add(R.bull); R.bull.visible = false;
+    }
     // head
     const head = new THREE.Group(); head.position.y = 43; up.add(head); R.head = head;
     const faces = Q.faces || L.player;
@@ -800,6 +805,23 @@ const V = (() => {
       R.shield.visible = power.shield > 0;
       if (R.shield.visible) R.shield.scale.set(0.75 + Math.sin(gameTime * 6) * 0.02, 1.1, 0.75);
       R.megaHand.visible = power.mega > 0;
+      R.goldHand.visible = power.golden > 0 && power.mega <= 0;
+      // transformations replace the human model
+      const hawk = power.hawk > 0, bull = power.rush > 0;
+      R.tilt.visible = !hawk && !bull; R.blob.visible = !hawk;
+      R.hawk.visible = hawk; R.bull.visible = bull;
+      if (hawk) {
+        R.hawk.rotation.y = R.h;
+        const flap = Math.sin(gameTime * (p.swoopT > 0 ? 6 : 14));
+        R.hawk.userData.wl.rotation.x = -0.25 - flap * 0.6; R.hawk.userData.wr.rotation.x = 0.25 + flap * 0.6;
+        R.hawk.rotation.z = p.swoopT > 0 ? -0.5 : 0;
+      }
+      if (bull) {
+        R.bull.rotation.y = R.h;
+        const ph = gameTime * 22;
+        R.bull.userData.legs.forEach((l, i) => { l.rotation.z = Math.sin(ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.7; });
+      }
+      R.root.scale.setScalar(p.size);
       for (const s of R.skates) s.visible = power.skates > 0;
       const blink = p.invuln > 0 && p.downT <= 0 && ((p.invuln * 10) | 0) % 2 === 0;
       R.root.visible = !p.hidden && !blink;
@@ -814,7 +836,7 @@ const V = (() => {
     R.yaw.rotation.y = R.h;
     const m = d.moveAmt || 0, ph = d.phase * 1.4;
     if (d.state !== 'frozen') R.legs.forEach((l, i) => { l.rotation.z = Math.sin(ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)) * 0.6 * m; });
-    const angry = d.state === 'chase' || d.state === 'revenge';
+    const angry = d.state === 'chase' || d.state === 'revenge' || d.state === 'alert' || d.state === 'latched' || d.state === 'hound';
     R.tail.rotation.z = 0.6 + Math.sin(gameTime * (angry ? 25 : 12)) * 0.4;
     R.tail.rotation.x = Math.sin(gameTime * (angry ? 25 : 12)) * 0.5;
     R.ice.visible = d.state === 'frozen';
@@ -839,6 +861,7 @@ const V = (() => {
       mesh(box(L * 0.46 - 6, 2, c.depth - 14), mat(shadeHex(c.color, 30)), -L * 0.05, 51.5, 0, g);
       if (c.taxi) { mesh(box(22, 7, 12), mat('#2d3436'), -L * 0.05, 56, 0, g); mesh(box(22.6, 2, 12.6), mat('#ffffff'), -L * 0.05, 56, 0, g); }
       mesh(box(L + 0.5, 3, c.depth - 5.4), mat(shadeHex(c.color, -40)), 0, 14, 0, g);
+      if (c.sports) { mesh(box(8, 3, c.depth - 8), mat('#111111'), -L / 2 + 6, 44, 0, g); for (const z of [-1, 1]) mesh(box(3, 12, 3), mat('#111111'), -L / 2 + 6, 37, z * 16, g); mesh(box(L * 0.3, 0.6, 10), mat('#ffffff'), L * 0.15, 32.5, 0, g); }
     }
     for (const z of [-1, 1]) {
       mesh(box(1, 6, 8), new THREE.MeshBasicMaterial({ color: 0xfff3a0 }), L / 2 + 0.2, 22, z * (c.depth / 2 - 10), g);
@@ -952,6 +975,69 @@ const V = (() => {
     mergePerGroup(g, (g.userData.own = []));
     g.userData.shadow = blob(16, g, 2.2);
     g.rotation.y = r.dir > 0 ? 0 : Math.PI;
+    return g;
+  }
+  function buildHawk() {
+    const g = new THREE.Group(), b = new THREE.Group(); g.add(b); b.scale.setScalar(2.4);
+    const brown = mat('#8d5a2b'), light = mat('#c8a165'), white = mat('#f5f5f5'), yellow = mat('#f1c40f');
+    mesh(sph(10, 14, 10), brown, 0, 0, 0, b).scale.set(1.9, 0.9, 1);
+    mesh(sph(7.5, 12, 10), white, 17, 5, 0, b);
+    const beak = mesh(cone(2.6, 8, 8), yellow, 25, 3, 0, b); beak.rotation.z = -Math.PI / 2 - 0.3;
+    for (const z of [-3, 3]) mesh(sph(1.4, 6, 4), mat('#111111'), 21, 7, z, b);
+    const tail = mesh(box(14, 2, 14), light, -21, 0, 0, b); tail.rotation.z = 0.15;
+    const wing = (side) => { const w = new THREE.Group(); w.position.set(2, 3, side * 8); b.add(w); const m = mesh(box(18, 2, 34), brown, 0, 0, side * 17, w); mesh(box(14, 2.2, 14), light, -4, 0.3, side * 30, w); return w; };
+    g.userData.wl = wing(-1); g.userData.wr = wing(1);
+    for (const z of [-4, 4]) mesh(cyl(1, 1, 8, 6), yellow, 2, -9, z, b);
+    return g;
+  }
+  function buildBull() {
+    const g = new THREE.Group(), b = new THREE.Group(); g.add(b); b.scale.setScalar(1.35);
+    const hide = mat('#5d3a1a'), dark = mat('#3e2412'), horn = mat('#f5f0e1');
+    mesh(sph(14, 14, 10), hide, 0, 30, 0, b).scale.set(1.8, 1.05, 1);
+    mesh(sph(13, 12, 10), hide, -4, 38, 0, b).scale.set(1, 0.9, 1.05); // hump
+    const head = new THREE.Group(); head.position.set(28, 34, 0); b.add(head);
+    mesh(sph(10, 12, 10), hide, 0, 0, 0, head).scale.set(1.2, 1, 0.95);
+    mesh(sph(6, 10, 8), mat('#d7a17a'), 9, -4, 0, head).scale.set(0.8, 0.8, 1.2);
+    mesh(torus(3, 0.8), mat('#f1c40f'), 12, -6, 0, head);
+    for (const z of [-1, 1]) {
+      const h = mesh(cone(2.6, 14, 8), horn, 0, 9, z * 10, head); h.rotation.x = -z * 1.0; h.rotation.z = -0.3;
+      mesh(sph(1.6, 6, 4), mat('#d63031'), 6, 3, z * 5, head);
+    }
+    const legs = [];
+    for (const [x, z] of [[14, -8], [14, 8], [-14, -8], [-14, 8]]) { const l = new THREE.Group(); l.position.set(x, 22, z); b.add(l); mesh(cyl(3.6, 3, 22, 8), dark, 0, -11, 0, l); mesh(box(7, 4, 7), mat('#111111'), 0, -22, 0, l); legs.push(l); }
+    const tail = mesh(cyl(1, 1, 18, 6), dark, -26, 34, 0, b); tail.rotation.z = 0.9;
+    g.userData.legs = legs;
+    return g;
+  }
+  function buildCruiser() {
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    const L = 150, D = 56;
+    mesh(box(L, 1, D), blobMat, 0, 0.6, 0, g);
+    mesh(box(L, 24, D - 6), mat('#f5f6fa'), 0, 20, 0, body);
+    mesh(box(L * 0.4, 24.4, D - 5.6), mat('#1e272e'), -L * 0.32, 20, 0, body);
+    mesh(box(L * 0.25, 24.4, D - 5.6), mat('#1e272e'), L * 0.38, 20, 0, body);
+    mesh(box(L + 0.6, 4, D - 5.2), mat('#0652dd'), 0, 15, 0, body);
+    mesh(box(L * 0.46, 20, D - 12), mat('#f5f6fa'), -L * 0.05, 41, 0, body);
+    mesh(box(L * 0.46 + 0.6, 14, D - 11), mat('#2d3e50'), -L * 0.05, 42, 0, body);
+    const red = new THREE.MeshBasicMaterial({ color: 0xff3838 }), blue = new THREE.MeshBasicMaterial({ color: 0x3867d6 });
+    g.userData.lr = mesh(box(12, 6, 10), red, -L * 0.05, 54, -8, body);
+    g.userData.lb = mesh(box(12, 6, 10), blue, -L * 0.05, 54, 8, body);
+    g.userData.wheels = [];
+    for (const x of [-L * 0.32, L * 0.32]) for (const z of [-1, 1]) { const w = mesh(cyl(11, 11, 7, 14), mat('#1e1e1e'), x, 11, z * (D / 2 - 4), g); w.rotation.x = Math.PI / 2; g.userData.wheels.push(w); w.userData.dyn = true; }
+    g.userData.lr.userData.dyn = g.userData.lb.userData.dyn = true;
+    mergePerGroup(body, (g.userData.own = []));
+    g.userData.body = body;
+    return g;
+  }
+  function buildBoomerHand() {
+    const g = new THREE.Group();
+    const h = new THREE.Group(); g.add(h); g.userData.spin = h;
+    const sk = mat('#ffcc99');
+    mesh(sph(10, 12, 10), sk, 0, 0, 0, h).scale.set(1.2, 0.45, 1);
+    for (let i = 0; i < 4; i++) mesh(box(4.5, 3.5, 13), sk, -6 + i * 4, 0, 13, h);
+    mesh(box(4.5, 3.5, 10), sk, 12, 0, 4, h).rotation.y = -0.8;
+    h.scale.setScalar(2.2);
+    g.userData.shadow = blob(20, g);
     return g;
   }
   function buildBanana() {
@@ -1097,8 +1183,17 @@ const V = (() => {
       const g = track(c, buildCar);
       g.position.set(c.x, 0, c.y);
       for (const w of g.userData.wheels) w.rotation.y = c.wheel;
+      if (c.wrecked) { g.rotation.z = Math.sin(gameTime * 30) * 0.02 + 0.06; }
     }
     if (truck) { const g = track(truck, buildTruck); g.position.set(truck.x, 0, truck.y); }
+    for (const c of cruisers) {
+      const g = track(c, buildCruiser);
+      g.position.set(c.x, 0, c.y); g.rotation.y = -c.h;
+      for (const w of g.userData.wheels) w.rotation.y = c.wheel;
+      const on = ((gameTime * 8) | 0) % 2 === 0 && c.state !== 'wrecked';
+      g.userData.lr.material.color.set(on ? '#ff3838' : '#5a1010'); g.userData.lb.material.color.set(on ? '#1b2a6b' : '#3867d6');
+      g.userData.body.rotation.z = c.state === 'wrecked' ? 0.12 : 0;
+    }
     for (const r of riders) {
       if (Math.abs(r.x - cx) > VW * 0.5 + 700) continue;
       const g = track(r, buildRider);
@@ -1119,6 +1214,7 @@ const V = (() => {
         g.userData.shadow.position.y = -it.z + 0.6;
       } else g.rotation.y = gameTime;
     }
+    for (const bm of boomerangs) { const g = track(bm, buildBoomerHand); g.position.set(bm.x, 50, bm.y); g.userData.spin.rotation.y = gameTime * 18; g.userData.shadow.position.y = -49.4; }
     for (const b of bananas) { const g = track(b, buildBanana); g.position.set(b.x, 0, b.y); g.rotation.y = b.rot; }
     for (const pi of pies) { if (pi.t < 0) continue; const g = track(pi, buildPie); g.position.set(pi.x, pi.z, pi.y); g.rotation.z = gameTime * 10; }
     for (const tn of tornados) {
@@ -1150,7 +1246,7 @@ const V = (() => {
     const sample = { look: Object.assign({}, PLAYER_LOOK), facing: 1, size: 1 };
     const R = buildRig(sample);
     const parts = [R.root, buildDog({ look: makeDogLook(), facing: 1 }).root, buildBox(), buildHeartItem(), buildMedkit(), buildPizza(), buildBanana(), buildUfo(), buildTornado(), buildPie(), buildTruck(),
-      buildCar({ len: 150, depth: 56, h: 46, color: '#e74c3c', dir: 1, taxi: true }), buildCoin(), buildRider({ kind: 'ebike', dir: 1, color: '#e74c3c', skin: '#e8b48f' }), buildRider({ kind: 'scooter', dir: -1, color: '#0984e3', skin: '#8d5524' }), leashLine()];
+      buildCar({ len: 150, depth: 56, h: 46, color: '#e74c3c', dir: 1, taxi: true }), buildCoin(), buildBoomerHand(), buildCruiser(), buildRider({ kind: 'ebike', dir: 1, color: '#e74c3c', skin: '#e8b48f' }), buildRider({ kind: 'scooter', dir: -1, color: '#0984e3', skin: '#8d5524' }), leashLine()];
     for (const o of parts) { if (o.parent) o.parent.remove(o); W.add(o); }
     W.traverse(o => { o.visible = true; });
     W.position.set(cx, 0, 200);

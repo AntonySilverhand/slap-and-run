@@ -173,6 +173,7 @@ const MISSIONS = [
   { k: 'heat',     run: true, max: true, make() { const n = pick([4, 6, 8]); return { text: 'Have ' + n + ' people chasing you at once', ev: 'heat', goal: n, reward: 20 + n * 10 }; } },
   { k: 'abduct',   make() { const n = pick([3, 6]); return { text: 'Get ' + n + ' people abducted by aliens', ev: 'abduct', goal: n, reward: 30 + n * 8 }; } },
   { k: 'hide',     make() { const n = pick([2, 4]); return { text: 'Hide in a phone booth ' + n + ' times', ev: 'hide', goal: n, reward: 30 + n * 10 }; } },
+  { k: 'copcrash', make() { const n = pick([2, 4]); return { text: 'Wreck ' + n + ' police cars', ev: 'copcrash', goal: n, reward: 50 + n * 15 }; } },
   { k: 'bike',     make() { const n = pick([2, 4, 6]); return { text: 'Get ' + n + ' chasers wiped out by e-bikes', ev: 'bike', goal: n, reward: 35 + n * 10 }; } },
   { k: 'visit',    run: true, make() { const d = pick(['downtown', 'park', 'residential']); return { text: 'Reach ' + DISTRICTS[d].name + ' in one run', ev: 'district', district: d, goal: 1, reward: 50 }; } },
 ];
@@ -316,3 +317,8 @@ function importCode(code) {
     return name;
   } catch (e) { return null; }
 }
+sfx.hawk = () => { tone(1800, 0.5, 'sawtooth', 0.06, 900); noise(0.4, 3000, 1, 0.2, 'bandpass', 1200); };
+sfx.screech = () => { tone(2400, 0.18, 'sawtooth', 0.05, 1500); };
+sfx.bull = () => { tone(110, 0.6, 'sawtooth', 0.18, 70); noise(0.5, 400, 0.7, 0.4, 'lowpass', 150); };
+sfx.siren = () => { tone(650, 0.35, 'square', 0.04, 950); tone(950, 0.35, 'square', 0.04, 650, 0.38); };
+sfx.bigcrash = () => { noise(0.6, 1200, 0.4, 1.0, 'lowpass', 120); tone(70, 0.5, 'sine', 0.6, 30); noise(0.3, 5000, 1, 0.4, 'highpass'); };
